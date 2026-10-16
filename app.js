@@ -27,6 +27,27 @@ function expiryChip(expiry, today = new Date()) {
   return `<span class="chip green">Valid till ${esc(expiry)}</span>`;
 }
 
+// ---------- OPITO verify link ----------
+const OPITO_RE = /\b(?:BOSIET|FOET|HUET|CA-?EBS|TSBB|OPITO)\b|^\s*5\d{3}\s*-/i;
+const isOpito = (cat) => !!cat && OPITO_RE.test(cat);
+// Surname = last word of the name (also for Malaysian names like "AHMAD BIN ALI").
+const surname = (name) => { const w = String(name || '').trim().split(/\s+/); return w[w.length - 1] || ''; };
+function opitoUrl(name, certNo) {
+  return 'https://www.thehubopito.com/public/validate?Surname=' + encodeURIComponent(surname(name)) + '&Ref=' + encodeURIComponent(certNo);
+}
+function opitoBlock(cat, name, certNo) {
+  if (!isOpito(cat) || !certNo) return '';
+  return `<div class="opito"><a class="opito-btn" href="${esc(opitoUrl(name, certNo))}" target="_blank" rel="noopener noreferrer">Verify on OPITO ↗</a>
+    <button class="copy-btn" type="button" data-copy="${esc(certNo)}">Copy number</button>
+    <p class="opito-note">Tick "I'm not a robot" and press Validate on the OPITO page.</p></div>`;
+}
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.copy-btn'); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; }
+  catch { window.prompt('Copy this number:', b.dataset.copy); }
+  setTimeout(() => { b.textContent = 'Copy number'; }, 1500);
+});
+
 function stamp() {
   $('lastChecked').textContent = new Date().toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true});
 }
@@ -212,6 +233,7 @@ function renderResult(r) {
       <div class="row"><span>Certificate No</span>${val(r.certificate_number)}</div>
       <div class="row"><span>Issue date</span>${val(r.issue_date)}</div>
       <div class="row"><span>Expiry date</span>${r.expired ? `<b class="exp">${esc(r.expiry_date)} (expired)</b>` : val(r.expiry_date)}</div></div>`;
+    rows += opitoBlock(r.category, r.name, r.certificate_number);
     confirm = `<button class="teal" id="confirmBtn" type="button">${r.expired ? 'Confirm (expired)' : 'Confirm'}</button>`;
   }
   $('result').innerHTML = head + warn + rows + confirm +
@@ -253,6 +275,7 @@ function load() {
       <div class="item-top"><h5>${esc(c.type)}</h5></div>
       <div class="meta">${esc(c.name || 'Name not found')}<br>No: ${esc(c.certificate_number || 'Not found')}</div>
       <div class="chips">${expiryChip(c.expiry_date)}<span class="chip ver">✓ Verified from document</span></div>
+      ${opitoBlock(c.category || c.type, c.name, c.certificate_number)}
     </div>`).join('');
 }
 

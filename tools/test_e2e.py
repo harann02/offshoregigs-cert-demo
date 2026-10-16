@@ -23,7 +23,14 @@ with sync_playwright() as p:
     pg.click('#uploadBtn'); pg.wait_for_selector('#result:not([hidden])', timeout=120000)
     t = pg.inner_text('#result'); shot('03_detected_pdf.png')
     res['pdf'] = {'text': t, 'ok': all(s in t for s in ['Category\n5700 - BOSIET WITH EBS', 'AHMAD DEMO SAMPLE', 'DEMO-BOS-000123', '12/03/2025', '12/03/2029']) and 'Provider' not in t and 'Demo Survival Training Centre' not in t and pg.locator('#confirmBtn').count() == 1}
+    href = pg.get_attribute('#result .opito-btn', 'href')
+    res['opito'] = {'href': href, 'target': pg.get_attribute('#result .opito-btn', 'target'), 'note': pg.inner_text('#result .opito-note'),
+        'ok': href == 'https://www.thehubopito.com/public/validate?Surname=SAMPLE&Ref=DEMO-BOS-000123' and pg.get_attribute('#result .opito-btn', 'target') == '_blank'
+              and pg.locator('#result .copy-btn').count() == 1 and pg.inner_text('#result .opito-note') == 'Tick "I\'m not a robot" and press Validate on the OPITO page.'}
+    shot('14_verify_opito.png')
     pg.click('#confirmBtn'); pg.wait_for_selector('.item')
+    res['opito']['list_href'] = pg.get_attribute('.item .opito-btn', 'href')
+    res['opito']['ok'] = res['opito']['ok'] and res['opito']['list_href'] == href
     res['confirm'] = {'items': pg.locator('.item').count(), 'stored': pg.evaluate("JSON.parse(localStorage.getItem('offshoregigs-certificates')).length"), 'chip': pg.inner_text('.item .chips')}
     t = upload(S / 'sample-bosiet-FAKE.png', wait_reading=True); shot('04_detected_png.png')
     res['png'] = {'text': t, 'ocr': pg.evaluate('window.lastScan.pages[0]'), 'ok': '5700 - BOSIET WITH EBS' in t and pg.locator('#confirmBtn').count() == 1}
@@ -55,7 +62,7 @@ with sync_playwright() as p:
     res['admin'] = {'title': ad.title(), 'row': ad.inner_text('tbody'), 'added': ad.evaluate("localStorage.getItem('offshoregigs-categories-added')")}
     ad.close()
     t = upload(S / 'sample-irata-not-listed-FAKE.pdf'); shot('12_after_approve.png')
-    res['after_approve'] = {'text': t, 'ok': 'Category\nIRATA Rope Access Technician Level 1' in t and pg.locator('#confirmBtn').count() == 1}
+    res['after_approve'] = {'text': t, 'ok': 'Category\nIRATA Rope Access Technician Level 1' in t and pg.locator('#confirmBtn').count() == 1 and pg.locator('#result .opito-btn').count() == 0}
     pg.click('#cancelBtn'); pg.reload(); pg.wait_for_selector('.item')
     res['persist_after_reload'] = pg.locator('.item').count()
     pg.click('#refreshBtn'); res['last_checked'] = pg.inner_text('#lastChecked')

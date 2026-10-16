@@ -78,3 +78,7 @@ html,body{margin:0;background:#E9EDF2;font-family:-apple-system,BlinkMacSystemFo
 .sample a{color:#0F766E;font-weight:700}
 .warn.green{background:#E6F6EE;color:#11643A;border:1px solid #9AD8B6}
 .exp{color:#C92A2A}
+.opito{margin-top:12px}
+.opito-btn{display:block;text-align:center;border-radius:12px;background:#1E3A8A;color:#fff;font-weight:700;font-size:16px;padding:12px;text-decoration:none}
+.copy-btn{border:1px solid #D1D5DB;border-radius:10px;background:#fff;color:#374151;font-size:13px;font-weight:600;padding:6px 12px;margin-top:8px;cursor:pointer}
+.opito-note{font-size:13px;color:#4B5563;margin:6px 2px 0}
