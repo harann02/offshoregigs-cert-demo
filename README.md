@@ -16,6 +16,11 @@ No file is sent to any server.
 5. Tap **Confirm** to add it to your list, or **Cancel / Upload again**.
 
 - If the file has more than one certificate, you get a red warning and no Confirm button.
+- A 2-page file with the same certificate twice (duplicate scan) or a front/back (card + certificate)
+  counts as ONE certificate: pages with the same certificate number, the same type+name+dates,
+  near-identical text, or no conflicting number/name/type are merged (best-read page wins).
+  Pages with a different number, name or type still give the warning.
+  While reading, the screen shows "Reading page 1 of 2...".
 - If the type is not clear, you are asked to upload a clearer copy.
 - Your list is saved in this browser only (localStorage). Expiry chips are green,
   amber (less than 60 days left) or red (expired).

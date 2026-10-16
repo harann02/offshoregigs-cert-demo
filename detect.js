@@ -53,8 +53,8 @@
 
   const DATE = String.raw`(\d{1,2}(?:st|nd|rd|th)?\s*(?:-|–|to)\s*\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s*\d{4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s*[A-Za-z]{3,9}\.?,?\s*\d{4}|[A-Za-z]{3,9}\.?\s*\d{1,2}(?:st|nd|rd|th)?\s*,?\s*\d{4})`;
   const ISSUE_LABEL = String.raw`(?:date\s*of\s*(?:[il1|]ss?ue|award|completion|examination|medical|assessment|training)|[il1|]ssue[d]?\s*(?:date|on)?|awarded(?:\s*on)?|completion\s*date|date\s*completed|course\s*date|training\s*date|examination\s*date|date\s*of\s*course|tarikh\s*dikeluarkan)`;
-  const EXPIRY_LABEL = String.raw`(?:date\s*of\s*exp[il1|]ry|exp[il1|]ry(?:\s*date)?|expiration(?:\s*date)?|expires(?:\s*on)?|(?:valid|validity)\s*(?:until|till|til|to|through|thru)|fit\s*until|next\s*(?:medical|examination)\s*due|sah\s*sehingga|tarikh\s*luput)`;
-  const CERT_LABEL = String.raw`(?:certificate|certification|cert)\s*(?:no\.?|number|#|ref(?:erence)?)|serial\s*(?:no\.?|number)|reference\s*(?:no\.?|number)|ref\.?\s*no\.?|opito\s*(?:certification|learner|delegate)?\s*(?:no\.?|number|id)`;
+  const EXPIRY_LABEL = String.raw`(?:date\s*of\s*exp[il1|]ry|exp[il1|]ry(?:\s*date)?|expiration(?:\s*date)?|exp[il1|]red\s*(?:date|on)?|expires(?:\s*on)?|(?:valid|validity)\s*(?:until|till|til|to|through|thru)|fit\s*until|next\s*(?:medical|examination)\s*due|sah\s*sehingga|tarikh\s*luput)`;
+  const CERT_LABEL = String.raw`(?:certificate|certification|cert)\s*(?:no\.?|number|#|ref(?:erence)?)|serial\s*(?:no\.?|number)|s\s*/\s*n(?![a-z])\.?|reference\s*(?:no\.?|number)|ref\.?\s*no\.?|opito\s*(?:certification|learner|delegate)?\s*(?:no\.?|number|id)`;
   const PROVIDER_LABEL = String.raw`(?:training\s*(?:provider|centre|center|organisation|organization)|provider|issued\s*by|centre|center|medical\s*(?:centre|center|clinic)|clinic)`;
   const DOCTOR_LABEL = String.raw`(?:examining\s*(?:doctor|physician)|approved\s*(?:doctor|examiner)|medical\s*examiner)`;
   const PROVIDER_WORDS = String.raw`\b(?:training|centre|center|academy|institute|survival|sdn\.?\s*bhd|bhd|ltd|limited|llc|clinic|hospital|medical\s+services|safety\s+services|college|school)\b`;
@@ -318,10 +318,92 @@
     };
   }
 
+
+  // ---- multi-page files: group pages into certificates ----
+  // A 2-page PDF is often the same certificate twice (duplicate scan) or a front/back
+  // (e.g. card + full certificate). Pages are compared with the best-read page: same
+  // certificate number, same type+name+date, or near-identical text => same certificate.
+  // A page with no conflicting number/name/type (front/back) also joins it. Fields are
+  // merged, preferring the best-read page. Real conflicts still give "multiple".
+  function levRatio(a, b) {
+    a = compact(a); b = compact(b);
+    if (!a || !b) return 0; if (a === b) return 1;
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return 1 - prev[b.length] / Math.max(a.length, b.length);
+  }
+  function textSimilarity(a, b) {
+    const set = (t) => new Set(normalized(t).split(' ').filter((w) => w.length >= 3));
+    const A = set(a), B = set(b); if (!A.size || !B.size) return 0;
+    let both = 0; for (const w of A) if (B.has(w)) both++;
+    return both / (A.size + B.size - both);
+  }
+  const FIELDS = ['name', 'certificate_number', 'issue_date', 'expiry_date', 'provider'];
+  const pageScore = (f) => FIELDS.filter((k) => f[k]).length + (f.category !== UNKNOWN ? 2 : 0) + f.confidence;
+  const known = (f) => f.category !== UNKNOWN && f.confidence >= CONFIDENCE_THRESHOLD;
+
+  function comparePages(a, b, ta, tb) {
+    const numA = a.certificate_numbers, numB = b.certificate_numbers;
+    const sameNo = numA.some((x) => numB.some((y) => levRatio(x, y) >= 0.85));
+    const nameSim = a.name && b.name ? levRatio(a.name, b.name) : null;
+    const sim = textSimilarity(ta, tb);
+    const sameDates = (a.issue_date && a.issue_date === b.issue_date) || (a.expiry_date && a.expiry_date === b.expiry_date);
+    const conflicts = [];
+    if (numA.length && numB.length && !sameNo) conflicts.push('different certificate numbers');
+    if (nameSim !== null && nameSim < 0.8) conflicts.push('different names');
+    if (known(a) && known(b) && a.category !== b.category) conflicts.push('different certificate types (' + a.category + ', ' + b.category + ')');
+    // A real conflict (other number, other person, other type) always wins: two people's
+    // certificates from one provider have near-identical text but are different certificates.
+    const allSame = nameSim !== null && nameSim >= 0.8 && a.category === b.category && known(a) &&
+      a.issue_date && a.issue_date === b.issue_date && a.expiry_date && a.expiry_date === b.expiry_date;
+    if (allSame && conflicts.length === 1 && conflicts[0] === 'different certificate numbers') return { same: true, how: 'same type, name and dates (number read differently)', conflicts: [] };
+    if (conflicts.length) return { same: false, how: null, conflicts };
+    const how = sameNo ? 'same certificate number' : sim >= 0.6 ? 'near-identical text'
+      : (nameSim !== null && sameDates && known(a) && a.category === b.category) ? 'same type, name and dates'
+      : 'no conflicting details (front/back)';
+    return { same: true, how, conflicts };
+  }
+
+  function detectPages(pages) {
+    const list = (pages || []).map((p) => p || '');
+    const used = list.map((p, i) => [p, i]).filter(([p]) => p.trim());
+    if (used.length <= 1) { const f = detect(list.join('\n'), list); f.page_groups = [used.map(([, i]) => i + 1)]; return f; }
+    const per = used.map(([p]) => detect(p, [p]));
+    let anchor = 0; per.forEach((f, i) => { if (pageScore(f) > pageScore(per[anchor])) anchor = i; });
+    const order = per.map((f, i) => i).sort((x, y) => (x === anchor ? -1 : y === anchor ? 1 : pageScore(per[y]) - pageScore(per[x])));
+    const multi = [], matches = [], group = [];
+    per.forEach((f, i) => { for (const r of f.multiple_reasons) multi.push('page ' + (used[i][1] + 1) + ': ' + r); });
+    for (const i of order) {
+      if (i === anchor) { group.push(i); continue; }
+      const c = comparePages(per[anchor], per[i], used[anchor][0], used[i][0]);
+      if (c.same) { group.push(i); matches.push('page ' + (used[i][1] + 1) + ': ' + c.how); }
+      else multi.push('page ' + (used[i][1] + 1) + ' looks like a different certificate: ' + c.conflicts.join(', '));
+    }
+    const best = per[anchor];
+    const merged = Object.assign({}, best);
+    for (const k of FIELDS) { if (!merged[k]) for (const i of group) if (per[i][k]) { merged[k] = per[i][k]; break; } }
+    merged.certificate_numbers = merged.certificate_number ? [merged.certificate_number] : [];
+    if (!known(best)) for (const i of group) if (known(per[i])) { merged.category = per[i].category; merged.confidence = per[i].confidence; merged.scores = per[i].scores; merged.evidence = per[i].evidence; break; }
+    const notes = new Set(); for (const i of group) per[i].notes.forEach((n) => notes.add(n));
+    if (merged.category !== UNKNOWN) notes.delete('We could not confidently tell the certificate type. Please choose it manually.');
+    merged.notes = [...notes];
+    merged.needs_manual_type = merged.category === UNKNOWN;
+    merged.multiple_certificates = multi.length > 0; merged.multiple_reasons = [...new Set(multi)];
+    merged.warning = multi.length ? best.warning || 'Multiple certificates detected: this file looks like it has more than one certificate. Please upload them one at a time.' : null;
+    merged.page_groups = [group.map((i) => used[i][1] + 1).sort((a, b) => a - b)];
+    merged.page_matches = matches;
+    merged.title_text = used[anchor][0];
+    return merged;
+  }
+
   // ---- course title + OffshoreGigs category matching ----
   const LABEL_START = /^(?:opito|course\s*code|certificate\s*no|cert|date|training\s*date|ic\b|passport|name|this\s+certificate|valid|expiry|issued|provider|who\b|in$)/i;
   function courseTitle(lines) {
-    const intro = /^(?:in|for|the|course)$|(?:has|have)\s+(?:successfully\s+)?(?:completed|attended|passed)|learning\s+outcomes\s+for|completed\s+a\b.*course|^in\s*\|?$/i;
+    const intro = /^(?:in|for|the|course)$|(?:has|have)\s+(?:successfully\s+)?(?:completed|attended|passed|certified)|learning\s+outcomes\s+for|completed\s+a\b.*course|^in\s*\|?$/i;
     const ok = (l) => l && l.length >= 4 && l.length <= 110 && !/:/.test(l) && !LABEL_START.test(l) && /[a-z]{3}/i.test(l);
     for (let i = 0; i < lines.length - 1; i++) {
       if (!intro.test(lines[i])) continue;
@@ -335,7 +417,7 @@
       return t.replace(/\s+/g, ' ').trim();
     }
     const kw = /(?:training|course|awareness|induction|technician|competen|medical|safety|rescue|first\s+aid)/i;
-    for (const l of lines) if (ok(l) && kw.test(l) && !/this\s+is\s+to|certificate\s+of\s+(?:completion|competence|attendance|achievement)|sdn|bhd|ltd|centre|center|academy|clinic/i.test(l)) return l.trim();
+    for (const l of lines) if (ok(l) && kw.test(l) && !/this\s+is\s+to|certificat\w*\s+of\s+|sdn|bhd|ltd|centre|center|academy|clinic/i.test(l)) return l.trim();
     return null;
   }
 
@@ -364,6 +446,7 @@
    * 1) OPITO course code ("Course Code: 5501") equal to a list entry's "5501 - ..." prefix.
    * 2) OPITO family (BOSIET/FOET/CA-EBS) + modifiers (Tropical, CA-EBS/EBS, TSBB, shallow water).
    * 3) Any other list name whose significant words all appear in the text (longest wins). */
+  const OPTIONAL_WORDS = new Set(['basic']);
   function matchCategory(text, found, categories) {
     const names = (categories || []).filter(Boolean);
     const code = /course\s*code\s*[:.\-]?\s*(\d{4})\b/i.exec(text);
@@ -386,8 +469,12 @@
     let best = null;
     for (const n of names) {
       if (base && baseOf(n)) continue;
-      const w = words(n);
-      if (w.length && w.every((x) => have.has(x)) && (!best || w.length > best.w)) best = { name: n, how: 'name words', w: w.length };
+      // "BASIC" is the default level, so "Working at Height Competency" still matches
+      // "WORKING AT HEIGHT (WAH) BASIC" (but never LEVEL 2 / LEVEL 3, which need their words).
+      const w = words(n).filter((x) => !(OPTIONAL_WORDS.has(x) && !have.has(x)));
+      if (w.length >= 2 || (w.length && w.length === words(n).length)) {
+        if (w.every((x) => have.has(x)) && (!best || w.length > best.w)) best = { name: n, how: 'name words', w: w.length };
+      }
     }
     return best ? { name: best.name, how: best.how } : null;
   }
@@ -409,7 +496,7 @@
     const text = opts.text || '';
     const unknownType = found.category === UNKNOWN || found.confidence < CONFIDENCE_THRESHOLD;
     const match = opts.categories ? matchCategory(text, unknownType ? null : found, opts.categories) : null;
-    const title = courseTitle(splitLines(text)) || (unknownType ? null : found.category);
+    const title = (found.title_text && courseTitle(splitLines(found.title_text))) || courseTitle(splitLines(text)) || (unknownType ? null : found.category);
     let status;
     if (found.multiple_certificates) status = 'multiple';
     else if (match) status = 'ok';
@@ -426,6 +513,6 @@
     };
   }
 
-  const api = { detect, summarise, matchCategory, courseTitle, isExpired, parseDate, normalized, scoreText, confidenceFrom, TYPES, UNKNOWN, CONFIDENCE_THRESHOLD };
+  const api = { detect, detectPages, textSimilarity, summarise, matchCategory, courseTitle, isExpired, parseDate, normalized, scoreText, confidenceFrom, TYPES, UNKNOWN, CONFIDENCE_THRESHOLD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CertDetect = api;
 })(typeof window !== 'undefined' ? window : globalThis);

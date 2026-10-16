@@ -72,8 +72,9 @@ async function ocrWorker() {
   if (!tessPromise) tessPromise = loadScript(TESSERACT).then(async () => { worker = await Tesseract.createWorker('eng'); return worker; });
   return tessPromise;
 }
+let pageLabel = '';
 async function ocr(image, psm = '3') {
-  note('Reading text from the image (first time downloads the reader, ~10 MB)...');
+  note(pageLabel + (worker ? 'Reading text from the image...' : 'Reading text from the image (first time downloads the reader, ~10 MB)...'));
   const w = await ocrWorker();
   // tesseract.js defaults to PSM 6 (one uniform block), which scrambles certificate
   // layouts (left label column + signature + logo). 3 = automatic layout, 11 = sparse text.
@@ -113,7 +114,7 @@ async function ocrBest(source) {
   const passes = [[3500, '3'], [2600, '11'], [0, '3']];
   let best = '', bestScore = -1;
   for (const [scale, psm] of passes) {
-    if (bestScore >= 0) note('Trying again with a different image setting...');
+    if (bestScore >= 0) note(pageLabel + 'Trying again with a different image setting...');
     const text = await ocr(scale ? await prepare(source, scale) : source, psm);
     const score = fieldScore(text);
     if (score > bestScore) { best = text; bestScore = score; }
@@ -147,11 +148,15 @@ async function pdfPages(buffer) {
   const doc = await lib.getDocument({ data: buffer }).promise;
   const pages = [];
   for (let n = 1; n <= doc.numPages; n++) {
+    pageLabel = doc.numPages > 1 ? `Reading page ${n} of ${doc.numPages}... ` : '';
+    note(pageLabel || 'Reading the PDF...');
     const page = await doc.getPage(n);
     let text = itemsToText((await page.getTextContent()).items);
     if (text.replace(/\s/g, '').length < 20) {
       // No usable text layer (scanned PDF): render the page and OCR it.
-      const viewport = page.getViewport({ scale: 2 });
+      // Big scans: cap the rendered size (~2600 px long side) so OCR stays fast on phones.
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: Math.max(0.5, Math.min(2, 2600 / Math.max(base.width, base.height))) });
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width; canvas.height = viewport.height;
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
@@ -160,6 +165,7 @@ async function pdfPages(buffer) {
     }
     pages.push(text);
   }
+  pageLabel = '';
   return pages;
 }
 
@@ -171,7 +177,8 @@ async function readCertificate(file) {
   if (head.startsWith('%PDF-')) pages = await pdfPages(buffer);
   else if (head === '\x89PNG\r\n\x1a\n' || (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff)) pages = [await ocrBest(file)];
   else throw new Error('Only PDF, PNG or JPG files are supported.');
-  const found = CertDetect.detect(pages.join('\n'), pages);
+  note(pages.length > 1 ? 'Checking the pages...' : 'Checking the certificate...');
+  const found = CertDetect.detectPages(pages);
   const text = pages.join('\n');
   const result = CertDetect.summarise(found, file.name || 'upload', { text, categories: OGCategories.all() });
   window.lastScan = { pages, found, result }; // handy for debugging/tests

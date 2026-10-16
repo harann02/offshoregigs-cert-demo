@@ -94,3 +94,30 @@ make_pdf('samples/sample-multiple-FAKE.pdf', [BOSIET, MEDICAL])
 make_pdf('samples/sample-unknown-FAKE.pdf', [UNKNOWN])
 make_pdf('samples/sample-tropical-bosiet-caebs-FAKE.pdf', [TROPICAL])
 make_pdf('samples/sample-irata-not-listed-FAKE.pdf', [IRATA])
+# Same certificate scanned twice (2nd copy read slightly differently).
+BOSIET_COPY = [(s, t.replace('Training Provider: ', 'Provider: ')) for s, t in BOSIET]
+make_pdf('samples/sample-duplicate-2page-FAKE.pdf', [BOSIET, BOSIET_COPY])
+# Front (ID card) + back (full certificate): card has no certificate number.
+WAH_CARD = [
+    (18, 'WORKING'), (18, 'AT HEIGHT'), (18, 'COMPETENCY'),
+    (14, 'AHMAD DEMO SAMPLE'), (12, '000000-00-0000'),
+    (12, 'VENUE AT:'), (12, 'DEMO TRAINING CENTRE SDN BHD'),
+    (12, 'TRAINING DATE:'), (12, '23 JANUARY 2025'),
+    (12, 'EXPIRED DATE:'), (12, '23 JANUARY 2028'),
+    (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
+]
+WAH_CERT = [
+    (16, 'Certification of Competency'),
+    (12, 'This is to certify that'),
+    (16, 'AHMAD DEMO SAMPLE'),
+    (12, '000000-00-0000'),
+    (12, 'Has Successfully Certified'),
+    (14, 'WORKING AT HEIGHT COMPETENCY'),
+    (14, 'TRAINING & ASSESSMENT'),
+    (12, 'Held On'), (12, '23rd JANUARY 2025'),
+    (12, 'At'), (12, 'DEMO TRAINING CENTRE SDN BHD'),
+    (12, 'S/N: WAH 23-01-2025-9'),
+    (12, 'EXPIRED DATE: 23rd JANUARY 2028'),
+    (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
+]
+make_pdf('samples/sample-front-back-FAKE.pdf', [WAH_CARD, WAH_CERT])

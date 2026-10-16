@@ -63,4 +63,50 @@ t('admin-approved category matches future uploads', () => {
 });
 t('shopping list stays unknown', () => assert.strictEqual(run('Shopping list\nBread, milk, eggs').status, 'unknown'));
 t('HUET-only (not in list) -> not_listed', () => assert.strictEqual(run('Certificate\nHelicopter Underwater Escape Training (HUET)\nName: A B').status, 'not_listed'));
+
+// ---- multi-page grouping ----
+const runPages = (pages, cats = CATS) => { const f = D.detectPages(pages); return Object.assign(D.summarise(f, 'x', { text: pages.join('\n'), categories: cats, today }), { f }); };
+const B1 = `BOSIET\nBasic Offshore Safety Induction and Emergency Training with EBS\nOPITO Course Code: 5700\nCertificate of Completion\nName: AHMAD DEMO SAMPLE\nCertificate No: DEMO-BOS-000123\nDate of Issue: 12/03/2025\nExpiry Date: 12/03/2029`;
+t('duplicate pages (same cert number) -> one certificate, not multiple', () => {
+  const r = runPages([B1, B1.replace('Certificate of Completion', 'Certificate of Completlon')]);
+  assert.strictEqual(r.status, 'ok'); assert.strictEqual(r.category, '5700 - BOSIET WITH EBS');
+  assert.strictEqual(r.certificate_number, 'DEMO-BOS-000123'); assert.deepStrictEqual(r.f.page_groups, [[1, 2]]);
+});
+t('duplicate with OCR misses on one copy: fields merged from both pages', () => {
+  const poor = B1.replace(/Expiry Date: .*/, 'Exp1ry D@te').replace(/Name: .*/, 'Narne');
+  const r = runPages([poor, B1.replace(/Date of Issue: .*/, '')]);
+  assert.strictEqual(r.status, 'ok'); assert.strictEqual(r.name, 'AHMAD DEMO SAMPLE');
+  assert.strictEqual(r.issue_date, '12/03/2025'); assert.strictEqual(r.expiry_date, '12/03/2029');
+});
+t('duplicate with slightly misread name and number still one certificate', () => {
+  const r = runPages([B1, B1.replace('AHMAD DEMO SAMPLE', 'AHMAD DEM0 SAMPLE').replace('000123', '0001Z3')]);
+  assert.strictEqual(r.status, 'ok'); assert.strictEqual(r.name, 'AHMAD DEMO SAMPLE');
+});
+const CARD = `WORKING\nAT HEIGHT\nCOMPETENCY\nAHMAD DEMO SAMPLE\n000000-00-0000\nVENUE AT:\nDEMO TRAINING CENTRE SDN BHD\nTRAINING DATE:\n23 JANUARY 2025\nEXPIRED DATE:\n23 JANUARY 2028`;
+const WAH = `Certification of Competency\nThis is to certify that\nAHMAD DEMO SAMPLE\n000000-00-0000\nHas Successfully Certified\nWORKING AT HEIGHT COMPETENCY\nTRAINING & ASSESSMENT\nHeld On\n23rd JANUARY 2025\nAt\nDEMO TRAINING CENTRE SDN BHD\nS/N: WAH 23-01-2025-9\nEXPIRED DATE: 23rd JANUARY 2028`;
+t('front/back (card + certificate) -> one Working at Height certificate with all fields', () => {
+  const r = runPages([CARD, WAH]);
+  assert.strictEqual(r.status, 'ok'); assert.strictEqual(r.category, 'WORKING AT HEIGHT (WAH) BASIC');
+  assert.strictEqual(r.name, 'AHMAD DEMO SAMPLE'); assert.strictEqual(r.certificate_number, 'WAH 23-01-2025-9');
+  assert.strictEqual(r.issue_date, '23/01/2025'); assert.strictEqual(r.expiry_date, '23/01/2028');
+  assert.strictEqual(r.detected_title, 'WORKING AT HEIGHT COMPETENCY TRAINING & ASSESSMENT');
+});
+t('front/back where the back has no name or number (terms page) -> one certificate', () => {
+  assert.strictEqual(runPages([B1, 'Terms and conditions\nThis card remains the property of the training centre.']).status, 'ok');
+});
+t('WAH LEVEL 2 still needs "level 2"', () => assert.strictEqual(runPages([WAH.replace('COMPETENCY\nTRAINING', 'LEVEL 2 TRAINING')]).category, 'WORKING AT HEIGHT (WAH) LEVEL 2'));
+t('two different certificates of the same type (different numbers + names) -> multiple', () => {
+  const r = runPages([B1, B1.replace('AHMAD DEMO SAMPLE', 'SITI DEMO EXAMPLE').replace('DEMO-BOS-000123', 'DEMO-BOS-999888')]);
+  assert.strictEqual(r.status, 'multiple'); assert.ok(r.multiple_reasons.some((x) => /different certificate numbers/.test(x)));
+});
+t('different types on each page -> multiple', () => {
+  const MED = 'Offshore Medical\nCertificate of Fitness\nName: SITI DEMO EXAMPLE\nCertificate No: DEMO-MED-000456\nFit for offshore work';
+  assert.strictEqual(runPages([B1, MED]).status, 'multiple');
+});
+t('same name, different numbers (two certificates of one person) -> multiple', () => {
+  assert.strictEqual(runPages([B1, B1.replace('DEMO-BOS-000123', 'DEMO-BOS-777000').replace('12/03/2025', '01/01/2021')]).status, 'multiple');
+});
+t('same type+name+both dates but number badly misread -> one certificate', () => {
+  assert.strictEqual(runPages([B1, B1.replace('DEMO-BOS-000123', 'XQ7-88')]).status, 'ok');
+});
 console.log(n + ' tests passed');

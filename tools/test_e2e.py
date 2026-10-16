@@ -45,6 +45,12 @@ with sync_playwright() as p:
     t = upload(S / 'sample-multiple-FAKE.pdf'); shot('05_multiple_warning.png')
     res['multiple'] = {'text': t, 'ok': 'Multiple certificates detected' in t and pg.locator('#confirmBtn').count() == 0 and pg.locator('#submitBtn').count() == 0}
     pg.click('#cancelBtn')
+    t = upload(S / 'sample-duplicate-2page-FAKE.pdf'); shot('05b_duplicate_2page.png')
+    res['duplicate'] = {'text': t, 'ok': 'Category\n5700 - BOSIET WITH EBS' in t and 'DEMO-BOS-000123' in t and 'Multiple' not in t and pg.locator('#confirmBtn').count() == 1}
+    pg.click('#cancelBtn')
+    t = upload(S / 'sample-front-back-FAKE.pdf'); shot('05c_front_back.png')
+    res['front_back'] = {'text': t, 'ok': all(s in t for s in ['Category\nWORKING AT HEIGHT (WAH) BASIC', 'AHMAD DEMO SAMPLE', 'WAH 23-01-2025-9', '23/01/2025', '23/01/2028']) and 'Multiple' not in t and pg.locator('#confirmBtn').count() == 1}
+    pg.click('#cancelBtn')
     # Unknown flow: pick an existing category
     t = upload(S / 'sample-unknown-FAKE.pdf')
     dis = pg.is_disabled('#submitBtn')
