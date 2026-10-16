@@ -22,7 +22,7 @@ with sync_playwright() as p:
     pg.click('#sampleLink'); pg.wait_for_selector('#fileBox.has'); shot('01_upload.png')
     pg.click('#uploadBtn'); pg.wait_for_selector('#result:not([hidden])', timeout=120000)
     t = pg.inner_text('#result'); shot('03_detected_pdf.png')
-    res['pdf'] = {'text': t, 'ok': all(s in t for s in ['Category\n5700 - BOSIET WITH EBS', 'AHMAD DEMO SAMPLE', 'DEMO-BOS-000123', '12/03/2025', '12/03/2029', 'Demo Survival Training Centre Sdn Bhd']) and pg.locator('#confirmBtn').count() == 1}
+    res['pdf'] = {'text': t, 'ok': all(s in t for s in ['Category\n5700 - BOSIET WITH EBS', 'AHMAD DEMO SAMPLE', 'DEMO-BOS-000123', '12/03/2025', '12/03/2029']) and 'Provider' not in t and 'Demo Survival Training Centre' not in t and pg.locator('#confirmBtn').count() == 1}
     pg.click('#confirmBtn'); pg.wait_for_selector('.item')
     res['confirm'] = {'items': pg.locator('.item').count(), 'stored': pg.evaluate("JSON.parse(localStorage.getItem('offshoregigs-certificates')).length"), 'chip': pg.inner_text('.item .chips')}
     t = upload(S / 'sample-bosiet-FAKE.png', wait_reading=True); shot('04_detected_png.png')
@@ -60,5 +60,8 @@ with sync_playwright() as p:
     res['persist_after_reload'] = pg.locator('.item').count()
     pg.click('#refreshBtn'); res['last_checked'] = pg.inner_text('#lastChecked')
     shot('07_list.png')
+    body = pg.inner_text('body'); store = pg.evaluate("localStorage.getItem('offshoregigs-certificates')")
+    res['no_provider'] = {'ok': 'provider' not in body.lower() and 'provider' not in store.lower()}
+    shot('13_no_provider.png')
     b.close()
 print(json.dumps(res, indent=1))

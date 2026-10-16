@@ -211,8 +211,7 @@ function renderResult(r) {
       <div class="row"><span>Name</span>${val(r.name)}</div>
       <div class="row"><span>Certificate No</span>${val(r.certificate_number)}</div>
       <div class="row"><span>Issue date</span>${val(r.issue_date)}</div>
-      <div class="row"><span>Expiry date</span>${r.expired ? `<b class="exp">${esc(r.expiry_date)} (expired)</b>` : val(r.expiry_date)}</div>
-      <div class="row"><span>Provider</span>${val(r.provider)}</div></div>`;
+      <div class="row"><span>Expiry date</span>${r.expired ? `<b class="exp">${esc(r.expiry_date)} (expired)</b>` : val(r.expiry_date)}</div></div>`;
     confirm = `<button class="teal" id="confirmBtn" type="button">${r.expired ? 'Confirm (expired)' : 'Confirm'}</button>`;
   }
   $('result').innerHTML = head + warn + rows + confirm +
@@ -236,7 +235,7 @@ function confirmIt() {
   if (!pending || !pending.can_confirm) { $('resErr').textContent = 'This certificate cannot be confirmed.'; $('resErr').hidden = false; return; }
   const item = {};
   item.type = pending.category;
-  for (const k of ['category', 'detected_title', 'name', 'certificate_number', 'issue_date', 'expiry_date', 'provider', 'filename']) item[k] = pending[k];
+  for (const k of ['category', 'detected_title', 'name', 'certificate_number', 'issue_date', 'expiry_date', 'filename']) item[k] = pending[k];
   Object.assign(item, { id: Math.random().toString(16).slice(2) + Date.now().toString(16), verified_from_document: true, confirmed_at: new Date().toISOString() });
   const list = items(); list.unshift(item); save(list);
   cancel(); load();
@@ -252,7 +251,7 @@ function load() {
   $('list').innerHTML = list.map((c) => `
     <div class="card item">
       <div class="item-top"><h5>${esc(c.type)}</h5></div>
-      <div class="meta">${esc(c.name || 'Name not found')}<br>No: ${esc(c.certificate_number || 'Not found')} · Provider: ${esc(c.provider || 'Not found')}</div>
+      <div class="meta">${esc(c.name || 'Name not found')}<br>No: ${esc(c.certificate_number || 'Not found')}</div>
       <div class="chips">${expiryChip(c.expiry_date)}<span class="chip ver">✓ Verified from document</span></div>
     </div>`).join('');
 }

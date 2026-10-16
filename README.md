@@ -11,8 +11,8 @@ No file is sent to any server.
 2. Tap **Tap to select a file** and choose a PDF, PNG or JPG certificate.
    Or tap **Try a sample** to load a fake BOSIET certificate.
 3. Tap **Upload Certificate**. You will see "Reading your certificate...".
-4. The app shows **We detected: TYPE** with Name, Certificate No, Issue date,
-   Expiry date and Provider. You cannot edit these. If something is missing it says "Not found".
+4. The app shows **We detected: TYPE** with Name, Certificate No, Issue date
+   and Expiry date. You cannot edit these. If something is missing it says "Not found".
 5. Tap **Confirm** to add it to your list, or **Cancel / Upload again**.
 
 - If the file has more than one certificate, you get a red warning and no Confirm button.
