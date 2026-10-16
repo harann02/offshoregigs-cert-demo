@@ -51,9 +51,9 @@
   const MODULE_OF = { 'HUET': ['BOSIET', 'FOET'], 'CA-EBS': ['BOSIET', 'FOET'] };
   const MONTHS = {}; ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].forEach((m, i) => { MONTHS[m] = i + 1; });
 
-  const DATE = String.raw`(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s*[A-Za-z]{3,9}\.?,?\s*\d{4}|[A-Za-z]{3,9}\.?\s*\d{1,2}(?:st|nd|rd|th)?\s*,?\s*\d{4})`;
-  const ISSUE_LABEL = String.raw`(?:date\s*of\s*(?:issue|award|completion|examination|medical|assessment|training)|issue[d]?\s*(?:date|on)?|awarded(?:\s*on)?|completion\s*date|date\s*completed|course\s*date|examination\s*date|date\s*of\s*course|tarikh\s*dikeluarkan)`;
-  const EXPIRY_LABEL = String.raw`(?:date\s*of\s*expiry|expiry(?:\s*date)?|expiration(?:\s*date)?|expires(?:\s*on)?|valid\s*(?:until|till|to|through)|fit\s*until|next\s*(?:medical|examination)\s*due|sah\s*sehingga|tarikh\s*luput)`;
+  const DATE = String.raw`(\d{1,2}(?:st|nd|rd|th)?\s*(?:-|–|to)\s*\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s*\d{4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s*[A-Za-z]{3,9}\.?,?\s*\d{4}|[A-Za-z]{3,9}\.?\s*\d{1,2}(?:st|nd|rd|th)?\s*,?\s*\d{4})`;
+  const ISSUE_LABEL = String.raw`(?:date\s*of\s*(?:issue|award|completion|examination|medical|assessment|training)|issue[d]?\s*(?:date|on)?|awarded(?:\s*on)?|completion\s*date|date\s*completed|course\s*date|training\s*date|examination\s*date|date\s*of\s*course|tarikh\s*dikeluarkan)`;
+  const EXPIRY_LABEL = String.raw`(?:date\s*of\s*expiry|expiry(?:\s*date)?|expiration(?:\s*date)?|expires(?:\s*on)?|(?:valid|validity)\s*(?:until|till|til|to|through|thru)|fit\s*until|next\s*(?:medical|examination)\s*due|sah\s*sehingga|tarikh\s*luput)`;
   const CERT_LABEL = String.raw`(?:certificate|certification|cert)\s*(?:no\.?|number|#|ref(?:erence)?)|serial\s*(?:no\.?|number)|reference\s*(?:no\.?|number)|ref\.?\s*no\.?|opito\s*(?:certification|learner|delegate)?\s*(?:no\.?|number|id)`;
   const PROVIDER_LABEL = String.raw`(?:training\s*(?:provider|centre|center|organisation|organization)|provider|issued\s*by|centre|center|medical\s*(?:centre|center|clinic)|clinic)`;
   const DOCTOR_LABEL = String.raw`(?:examining\s*(?:doctor|physician)|approved\s*(?:doctor|examiner)|medical\s*examiner)`;
@@ -80,7 +80,10 @@
       scores[kind] = total;
     }
     for (const [module, parents] of Object.entries(MODULE_OF)) {
-      if (parents.some((p) => scores[p] >= 6)) scores[module] = Math.floor(scores[module] / 3);
+      // A course that bundles HUET / CA-EBS (e.g. "Tropical BOSIET with CA-EBS") is ONE
+      // certificate: the module score is dropped so it never counts as a second type.
+      const parent = Math.max(...parents.map((p) => scores[p]));
+      if (parent >= 6) scores[module] = 0;
     }
     if (scores['Medical'] >= 6) scores['OGUK/OEUK'] = Math.floor(scores['OGUK/OEUK'] / 3);
     return [scores, evidence];
@@ -109,6 +112,8 @@
 
   function parseDate(raw) {
     raw = raw.trim().replace(/[.,]+$/, '');
+    const range = /^\d{1,2}(?:st|nd|rd|th)?\s*(?:-|–|to)\s*(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s*\d{4})$/i.exec(raw);
+    if (range) raw = range[1];
     if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
       const [y, m, d] = raw.split('-').map(Number);
       return [mkDate(y, m, d), false];
@@ -186,7 +191,11 @@
       }
     }
     const pool = lines.slice(0, 12).concat(lines.slice(-8));
-    for (const line of pool) {
+    for (let line of pool) {
+      if (/^(?:sdn\.?\s*bhd\.?|bhd\.?|ltd\.?|limited|llc)$/i.test(line.trim())) {
+        const i = lines.indexOf(line);
+        if (i > 0 && !/\d|:/.test(lines[i - 1])) line = lines[i - 1] + ' ' + line; else continue;
+      }
       if (line.length <= 90 && new RegExp(PROVIDER_WORDS, 'i').test(line) && line !== person &&
           !/certif|has\s+(?:successfully\s+)?completed|this\s+is|emergency\s+training|induction|course|:/i.test(line)) return line.trim();
     }
@@ -243,7 +252,7 @@
       }
     }
     if (!name.value && !name.evidence.length) {
-      name = labelled(lines, String.raw`^(?:this\s+is\s+to\s+certify\s+that|this\s+is\s+certify\s+that)\s*`,
+      name = labelled(lines, String.raw`^(?:this\s+is\s+(?:to\s+)?certify(?:\s+that)?)\s*`,
         (v) => isName(v) && v.includes(' ') && !/survival|systems|services|issued\s+by/i.test(v), 1);
     }
     if (!name.value && !name.evidence.length) {

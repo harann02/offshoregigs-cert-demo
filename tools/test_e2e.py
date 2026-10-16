@@ -28,6 +28,9 @@ with sync_playwright() as p:
     t = upload(S / 'sample-bosiet-FAKE.png', wait_reading=True); shot('04_detected_png.png')
     res['png'] = {'text': t, 'ocr': pg.evaluate('window.lastScan.pages[0]'), 'ok': 'We detected: BOSIET' in t and pg.locator('#confirmBtn').count() == 1}
     pg.click('#confirmBtn'); pg.wait_for_selector('.item >> nth=1')
+    t = upload(S / 'sample-tropical-bosiet-caebs-FAKE.pdf'); shot('04b_tropical_bosiet.png')
+    res['tropical'] = {'text': t, 'ok': all(s in t for s in ['We detected: BOSIET', 'AHMAD DEMO SAMPLE', '000000DEMO000123', '12/03/2025', '11/03/2029']) and pg.locator('#confirmBtn').count() == 1}
+    pg.click('#cancelBtn')
     t = upload(S / 'sample-multiple-FAKE.pdf'); shot('05_multiple_warning.png')
     res['multiple'] = {'text': t, 'ok': 'Multiple certificates detected' in t and pg.locator('#confirmBtn').count() == 0}
     pg.click('#cancelBtn')

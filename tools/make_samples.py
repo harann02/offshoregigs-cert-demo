@@ -59,7 +59,24 @@ MEDICAL = [
     (14, 'Fit for offshore work'),
     (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
 ]
+TROPICAL = [
+    (12, 'DEMO OFFSHORE SAFETY'),
+    (12, 'SDN BHD'),
+    (12, 'This is to certify'),
+    (16, 'AHMAD DEMO SAMPLE'),
+    (12, 'IC/Passport No : 000000-00-0000'),
+    (12, 'has been assessed against and met the learning outcomes for'),
+    (14, 'Tropical BOSIET with CA-EBS and Travel Safely By Boat'),
+    (12, 'Opito Course Code : 0000'),
+    (11, 'Covers Helicopter Underwater Escape Training (HUET) with Compressed Air'),
+    (11, 'Emergency Breathing System (CA-EBS), Sea Survival and Fire Fighting'),
+    (14, 'Training Date : 10 - 12 MARCH 2025'),
+    (14, 'This certificate is valid till : 11 MARCH 2029'),
+    (14, 'Certificate No : 000000DEMO000123'),
+    (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
+]
 UNKNOWN = [(20, 'Shopping list'), (14, 'Bread, milk, eggs'), (11, 'FAKE SAMPLE FOR TESTING ONLY')]
 make_pdf('samples/sample-bosiet-FAKE.pdf', [BOSIET])
 make_pdf('samples/sample-multiple-FAKE.pdf', [BOSIET, MEDICAL])
 make_pdf('samples/sample-unknown-FAKE.pdf', [UNKNOWN])
+make_pdf('samples/sample-tropical-bosiet-caebs-FAKE.pdf', [TROPICAL])
