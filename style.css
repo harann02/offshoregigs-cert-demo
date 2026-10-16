@@ -86,3 +86,8 @@ html,body{margin:0;background:#E9EDF2;font-family:-apple-system,BlinkMacSystemFo
 .manual label{display:block;font-weight:700;color:var(--navy);margin-bottom:6px}
 .manual input,.manual select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:15px;margin-top:6px;background:#fff}
 .manual select option[hidden]{display:none}
+
+.profile-strip{background:#EEF4FB;border:1px solid #C9DAEE;border-radius:12px;padding:8px 12px;font-size:14px;margin-bottom:12px}
+.profile-strip .demo-tag{background:#0B2A4A;color:#fff;border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:700;margin-right:6px}
+.profile-strip a{margin-left:6px;color:#0E9F8E;font-weight:700}
+button.teal:disabled{opacity:.45;cursor:not-allowed}

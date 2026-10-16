@@ -8,6 +8,17 @@ const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.
 const TESSERACT = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
 const MAX_BYTES = 20 * 1024 * 1024;
 let selected = null, pending = null;
+// ---------- demo profile (name cross-check) ----------
+const PROFILE = 'offshoregigs-demo-profile-name', DEFAULT_PROFILE = 'AHMAD DEMO SAMPLE';
+const profileName = () => localStorage.getItem(PROFILE) || DEFAULT_PROFILE;
+function renderProfile() { $('profileName').textContent = profileName(); }
+function nameBanner(nc) {
+  if (nc.result === 'match') return '<div class="warn green" id="nameCheck" data-result="match"><b>Name matches your profile</b></div>';
+  if (nc.result === 'partial') return `<div class="warn amber" id="nameCheck" data-result="partial"><b>Name may not match your profile: ${esc(nc.cert_name)} vs ${esc(nc.profile_name)}</b>You can submit it for approval and our team will check it.</div>`;
+  if (nc.result === 'mismatch') return `<div class="warn red" id="nameCheck" data-result="mismatch"><b>This certificate is in someone else's name. You can only upload your own certificates.</b>Certificate: ${esc(nc.cert_name)} · Your profile: ${esc(nc.profile_name)}</div>`;
+  return `<div class="warn amber" id="nameCheck" data-result="not_found"><b>We could not find a name on this certificate</b>You can submit it for approval and our team will check it.</div>`;
+}
+const nameReason = (nc) => nc.result === 'partial' ? 'name check' : nc.result === 'not_found' ? 'name not found' : null;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const val = (v) => v ? `<b>${esc(v)}</b>` : '<b class="nf">Not found</b>';
@@ -216,6 +227,8 @@ $('uploadBtn').addEventListener('click', async () => {
 
 function renderResult(r) {
   pending = r;
+  const nc = r.status === 'multiple' ? null : NameCheck.compare(r.name, profileName());
+  r.name_check = nc;
   let head = '', warn = '', rows = '', confirm = '', manual = false;
   if (r.status === 'multiple') {
     head = '<h4>More than one certificate found</h4>';
@@ -236,7 +249,8 @@ function renderResult(r) {
       <div class="row"><span>Certificate No</span>${val(r.certificate_number)}</div>
       <div class="row"><span>Issue date</span>${val(r.issue_date)}</div>
       <div class="row"><span>Expiry date</span>${val(r.expiry_date)}</div></div>`;
-    confirm = '<button class="teal" id="submitBtn" type="button" disabled>Submit for approval</button>';
+    warn = nameBanner(nc);
+    confirm = nc.result === 'mismatch' ? '' : '<button class="teal" id="submitBtn" type="button" disabled>Submit for approval</button>';
   } else {
     head = `<h4>We detected: ${esc(r.category)}</h4><p class="det">Read from your document. These details cannot be edited.</p>`;
     if (r.expired) warn = `<div class="warn red" id="expiredWarn"><b>Expired on ${esc(r.expiry_date)}</b>This certificate has expired. You can still add it, but it will show as expired and may not be accepted for jobs.</div>`;
@@ -247,7 +261,11 @@ function renderResult(r) {
       <div class="row"><span>Issue date</span>${val(r.issue_date)}</div>
       <div class="row"><span>Expiry date</span>${r.expired ? `<b class="exp">${esc(r.expiry_date)} (expired)</b>` : val(r.expiry_date)}</div></div>`;
     rows += opitoBlock(r.category, r.name, r.certificate_number);
-    confirm = `<button class="teal" id="confirmBtn" type="button">${r.expired ? 'Confirm (expired)' : 'Confirm'}</button>`;
+    warn += nameBanner(nc);
+    const label = r.expired ? 'Confirm (expired)' : 'Confirm';
+    if (nc.result === 'match') confirm = `<button class="teal" id="confirmBtn" type="button">${label}</button>`;
+    else if (nc.result === 'mismatch') confirm = '';
+    else confirm = `<button class="teal" id="confirmBtn" type="button" disabled>${label}</button><button class="teal" id="submitBtn" type="button">Submit for approval</button>`;
   }
   $('result').innerHTML = head + warn + rows + confirm +
     '<button class="ghost" id="cancelBtn" type="button">Cancel / Upload again</button><p class="err" id="resErr" hidden></p>';
@@ -257,20 +275,24 @@ function renderResult(r) {
   if (manual) {
     const sel = $('catSelect'), q = $('catSearch'), other = $('otherName'), btn = $('submitBtn');
     const chosen = () => sel.value === '__other' ? other.value.trim() : sel.value;
-    const upd = () => { other.hidden = sel.value !== '__other'; btn.disabled = !chosen(); };
+    const upd = () => { other.hidden = sel.value !== '__other'; if (btn) btn.disabled = !chosen(); };
     q.oninput = () => { const t = q.value.toLowerCase(); for (const o of sel.options) o.hidden = o.value !== '__other' && !o.text.toLowerCase().includes(t); };
     sel.onchange = () => { upd(); if (!other.hidden) other.focus(); };
     other.oninput = upd;
-    btn.onclick = () => submitManual(chosen());
+    if (btn) btn.onclick = () => submitManual(chosen(), nameReason(nc));
   }
+  if (!manual && $('submitBtn')) $('submitBtn').onclick = () => submitManual(r.category, nameReason(nc));
 }
 
-function submitManual(category) {
+function submitManual(category, reason) {
   if (!pending || !category) return;
-  const item = { type: category, category, approval: 'pending', manual: true };
+  const nc = pending.name_check || {};
+  if (nc.result === 'mismatch') return; // never submit someone else's certificate
+  const item = { type: category, category, approval: 'pending', manual: pending.status !== 'ok', reason: reason || 'category' };
   for (const k of ['detected_title', 'name', 'certificate_number', 'issue_date', 'expiry_date', 'filename']) item[k] = pending[k] || null;
   item.id = Math.random().toString(16).slice(2) + Date.now().toString(16); item.confirmed_at = new Date().toISOString();
   const req = OGCategories.submit({ category, file_name: pending.filename, cert_id: item.id,
+    reason: item.reason, kind: item.manual ? 'manual' : 'name', cert_name: pending.name || null, profile_name: nc.profile_name || profileName(),
     fields: { name: item.name, certificate_number: item.certificate_number, issue_date: item.issue_date, expiry_date: item.expiry_date } });
   item.request_id = req.id; item.new_category = req.is_new;
   const list = items(); list.unshift(item); save(list);
@@ -284,7 +306,7 @@ function cancel() {
 }
 
 function confirmIt() {
-  if (!pending || !pending.can_confirm) { $('resErr').textContent = 'This certificate cannot be confirmed.'; $('resErr').hidden = false; return; }
+  if (!pending || !pending.can_confirm || !pending.name_check || pending.name_check.result !== 'match') { $('resErr').textContent = 'This certificate cannot be confirmed.'; $('resErr').hidden = false; return; }
   const item = {};
   item.type = pending.category;
   for (const k of ['category', 'detected_title', 'name', 'certificate_number', 'issue_date', 'expiry_date', 'filename']) item[k] = pending[k];
@@ -317,4 +339,13 @@ function load() {
 }
 
 $('refreshBtn').addEventListener('click', load);
+$('profileEdit').addEventListener('click', (e) => {
+  e.preventDefault();
+  const v = window.prompt('Demo only: your profile name', profileName());
+  if (v === null) return;
+  if (v.trim()) localStorage.setItem(PROFILE, v.trim()); else localStorage.removeItem(PROFILE);
+  renderProfile();
+  if (pending && !$('result').hidden) renderResult(pending);
+});
+renderProfile();
 show('upload'); load();

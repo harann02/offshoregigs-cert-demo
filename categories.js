@@ -78,8 +78,9 @@
     // Manual category submission for an unmatched document (Pending approval).
     submit(o) {
       const list = read(REQUESTS);
-      const isNew = !OGCategories.all().some((n) => n.toLowerCase() === String(o.category).toLowerCase());
-      const r = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'manual',
+      const isNew = o.kind === 'name' ? false : !OGCategories.all().some((n) => n.toLowerCase() === String(o.category).toLowerCase());
+      const r = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: o.kind || 'manual',
+        reason: o.reason || 'category', cert_name: o.cert_name || null, profile_name: o.profile_name || null,
         category: o.category, detected_title: o.category, is_new: isNew, file_name: o.file_name,
         fields: o.fields || {}, cert_id: o.cert_id, date: new Date().toISOString(), status: 'Pending' };
       list.unshift(r); write(REQUESTS, list); return r;

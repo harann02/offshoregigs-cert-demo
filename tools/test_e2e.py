@@ -98,5 +98,44 @@ with sync_playwright() as p:
     body = pg.inner_text('body'); store = pg.evaluate("localStorage.getItem('offshoregigs-certificates')")
     res['no_provider'] = {'ok': 'provider' not in body.lower() and 'provider' not in store.lower()}
     shot('13_no_provider.png')
+    # ---- name cross-check against the demo profile ----
+    res['profile_default'] = pg.inner_text('#profileStrip')
+    pg.once('dialog', lambda d: d.accept('Ahmad Sample'))
+    pg.click('#profileEdit'); prof1 = pg.inner_text('#profileName')
+    t = upload(sample=True); shot('19_name_match.png')
+    res['name_match'] = {'text': t, 'profile': prof1, 'ok': prof1 == 'Ahmad Sample' and 'Name matches your profile' in t
+        and pg.locator('#confirmBtn:not([disabled])').count() == 1 and pg.locator('#submitBtn').count() == 0}
+    pg.click('#cancelBtn')
+    pg.evaluate("localStorage.setItem('offshoregigs-demo-profile-name','Ahmad Ali')"); pg.reload(); pg.wait_for_selector('.item')
+    t = upload(sample=True); shot('20_name_partial.png')
+    res['name_partial'] = {'text': t, 'ok': 'Name may not match your profile: AHMAD DEMO SAMPLE vs Ahmad Ali' in t
+        and pg.is_disabled('#confirmBtn') and pg.locator('#submitBtn:not([disabled])').count() == 1}
+    pg.click('#submitBtn'); pg.wait_for_selector('.item:has-text("Pending approval")')
+    pg.evaluate("localStorage.setItem('offshoregigs-demo-profile-name','Lim Wei Jie')"); pg.reload(); pg.wait_for_selector('.item')
+    t = upload(sample=True); shot('21_name_mismatch.png')
+    res['name_mismatch'] = {'text': t, 'ok': "This certificate is in someone else's name. You can only upload your own certificates." in t
+        and pg.locator('#confirmBtn').count() == 0 and pg.locator('#submitBtn').count() == 0 and pg.locator('#cancelBtn').count() == 1}
+    pg.click('#cancelBtn')
+    # Manual-category flow: FAKE unmatched result with another person's name (profile Lim Wei Jie)
+    fake = "({status:'unknown', name:'%s', filename:'manual-FAKE.pdf', core_fields:1, certificate_number:null, issue_date:null, expiry_date:null})"
+    pg.evaluate("renderResult" + fake % 'AHMAD DEMO SAMPLE'); t = pg.inner_text('#result')
+    res['manual_mismatch'] = {'text': t, 'ok': "someone else's name" in t and pg.locator('#submitBtn').count() == 0 and pg.locator('#cancelBtn').count() == 1}
+    pg.click('#cancelBtn')
+    pg.evaluate("localStorage.setItem('offshoregigs-demo-profile-name','Ahmad Ali')"); pg.reload(); pg.wait_for_selector('.item')
+    pg.evaluate("renderResult" + fake % 'AHMAD DEMO SAMPLE'); t = pg.inner_text('#result')
+    pg.select_option('#catSelect', 'BASIC FIRST AID'); okp = 'Name may not match your profile: AHMAD DEMO SAMPLE vs Ahmad Ali' in t and not pg.is_disabled('#submitBtn')
+    pg.click('#submitBtn'); pg.wait_for_selector('.item:has-text("BASIC FIRST AID")')
+    res['manual_partial'] = {'ok': okp}
+    t = upload(S / 'sample-unknown-FAKE.pdf'); pg.select_option('#catSelect', 'BASIC H2S')
+    res['manual_not_found'] = {'ok': 'could not find a name' in t and not pg.is_disabled('#submitBtn')}
+    pg.click('#submitBtn'); pg.wait_for_selector('.item:has-text("BASIC H2S")')
+    pg.evaluate("localStorage.removeItem('offshoregigs-demo-profile-name')")
+    ad = pg.context.new_page(); ad.set_viewport_size({'width': 390, 'height': 844}); ad.goto(URL.rstrip('/') + '/admin.html'); ad.wait_for_selector('tr[data-id]')
+    rows = ad.inner_text('tbody'); ad.screenshot(path=str(OUT / '22_admin_name_reason.png'), full_page=True)
+    r0, r1, r2 = [ad.inner_text('tbody tr >> nth=%d' % i) for i in range(3)]
+    res['admin_name_reason'] = {'rows': ' || '.join([r0, r1, r2]), 'ok': 'name not found' in r0 and 'BASIC H2S' in r0
+        and 'name check' in r1 and 'BASIC FIRST AID' in r1 and 'Certificate name: AHMAD DEMO SAMPLE' in r1 and 'Profile name: Ahmad Ali' in r1
+        and 'name check' in r2 and '5700 - BOSIET WITH EBS' in r2 and 'Certificate name: AHMAD DEMO SAMPLE' in r2 and 'Profile name: Ahmad Ali' in r2}
+    ad.close()
     b.close()
 print(json.dumps(res, indent=1))

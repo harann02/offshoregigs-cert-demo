@@ -67,3 +67,15 @@ No file is sent to any server.
 - Images are upscaled, greyscaled and contrast-stretched before OCR, and read with automatic page
   layout (PSM 3), then sparse text (PSM 11) and the original image if fields are missing.
 - Tests: `node tools/test_detect.js` and `python3 tools/test_e2e.py URL OUTDIR`.
+
+## Name cross-check (demo profile)
+
+A "Demo profile" strip at the top shows **Logged in as: NAME** with an **Edit** link (demo only, saved in
+localStorage, default `AHMAD DEMO SAMPLE`). After reading, the certificate name is compared with it (`namecheck.js`):
+case/punctuation-insensitive, ignores BIN/BINTI/B./BT/A/L/A/P/S/O/D/O/MR/MS/ENCIK, OCR digit fixes (B1N → BIN),
+Jaro-Winkler per word (≥ 0.85 = same word), any order, initials and missing middle names.
+- **Match** (every word of the shorter name matched, at least 2 words, average ≥ 0.90): green, Confirm works.
+- **Partial**: amber "Name may not match your profile", Confirm disabled, Submit for approval (reason `name check`).
+- **Mismatch** (no word matches): red, no Confirm and no submission, Upload again only.
+- **Name not found**: Submit for approval (reason `name not found`). Same rules in the manual-category flow.
+The admin page shows the reason and both names. Tests: `node tools/test_namecheck.js`.

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OffshoreGigs Admin - Certificate approval requests</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 <style>
 body{background:#F3F5F8;font-family:system-ui,sans-serif;color:#0B2A4A;margin:0}
 .wrap{max-width:900px;margin:0 auto;padding:16px}
@@ -24,24 +24,25 @@ details{margin-top:16px;background:#fff;border-radius:12px;padding:12px;font-siz
   <h1>OffshoreGigs Admin - Certificate approval requests</h1>
   <div class="demo"><b>DEMO ONLY.</b> Requests and approved categories are stored in this browser's localStorage, so this page only shows requests made in the <b>same browser</b>. The real app needs a backend table (for example <code>certificate_category_requests</code>) and a categories table shared by all users and admins. <a href="./">Back to the upload demo</a></div>
   <div style="overflow-x:auto"><table>
-    <thead><tr><th>File name</th><th>Category</th><th>New category?</th><th>Extracted fields</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+    <thead><tr><th>File name</th><th>Category</th><th>New category?</th><th>Reason</th><th>Extracted fields</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
   <details><summary>Current category list (<span id="count"></span>)</summary><ol id="cats"></ol></details>
 </div>
-<script src="categories.js?v=8"></script>
+<script src="categories.js?v=9"></script>
 <script>
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function render() {
   const reqs = OGCategories.requests();
   document.getElementById('rows').innerHTML = reqs.length ? reqs.map((r) => `<tr data-id="${esc(r.id)}">
     <td>${esc(r.file_name)}</td><td>${esc(r.category || r.detected_title)}</td>
-    <td class="new">${r.kind === 'manual' ? (r.is_new ? '<b>Yes (new)</b>' : 'No (existing)') : '<b>Yes (new)</b>'}</td>
+    <td class="new">${r.kind === 'name' ? 'No (existing)' : r.kind === 'manual' ? (r.is_new ? '<b>Yes (new)</b>' : 'No (existing)') : '<b>Yes (new)</b>'}</td>
+    <td class="reason"><b>${esc(r.reason || 'category')}</b>${r.reason && r.reason !== 'category' ? `<br>Certificate name: ${esc(r.cert_name || 'Not found')}<br>Profile name: ${esc(r.profile_name || '-')}` : ''}</td>
     <td class="fields">${r.fields ? ['name:Name', 'certificate_number:Cert No', 'issue_date:Issue', 'expiry_date:Expiry'].map((x) => { const [k, l] = x.split(':'); return esc(l) + ': ' + esc(r.fields[k] || 'Not found'); }).join('<br>') : '-'}</td>
     <td>${esc(new Date(r.date).toLocaleString())}</td>
     <td class="st ${esc(r.status)}">${esc(r.status)}</td>
     <td>${r.status === 'Pending' ? `<button class="a" data-act="1">Approve</button><button class="r" data-act="0">Reject</button>` : ''}</td></tr>`).join('')
-    : '<tr><td colspan="7">No requests yet. Upload a document that we cannot match on the demo page, choose a category and press "Submit for approval".</td></tr>';
+    : '<tr><td colspan="8">No requests yet. Upload a document that we cannot match on the demo page, choose a category and press "Submit for approval".</td></tr>';
   const all = OGCategories.all(), added = OGCategories.added();
   document.getElementById('count').textContent = all.length + ' categories, ' + added.length + ' added by admin';
   document.getElementById('cats').innerHTML = all.map((n) => `<li>${esc(n)}${added.includes(n) ? ' <b>(added)</b>' : ''}</li>`).join('');
