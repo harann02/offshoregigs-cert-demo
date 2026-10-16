@@ -1,0 +1,43 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Length 631 >>
+stream
+BT
+/F1 13 Tf 1 0 0 1 60 760 Tm (Demo Rope Access Academy Sdn Bhd) Tj
+/F1 16 Tf 1 0 0 1 60 731 Tm (Certificate of Competence) Tj
+/F1 12 Tf 1 0 0 1 60 699 Tm (This is to certify) Tj
+/F1 16 Tf 1 0 0 1 60 671 Tm (SITI DEMO EXAMPLE) Tj
+/F1 12 Tf 1 0 0 1 60 639 Tm (has successfully completed) Tj
+/F1 14 Tf 1 0 0 1 60 611 Tm (IRATA Rope Access Technician Level 1) Tj
+/F1 14 Tf 1 0 0 1 60 581 Tm (Certificate No: DEMO-IRT-000789) Tj
+/F1 14 Tf 1 0 0 1 60 551 Tm (Date of Issue: 05/05/2025) Tj
+/F1 14 Tf 1 0 0 1 60 521 Tm (Expiry Date: 05/05/2028) Tj
+/F1 11 Tf 1 0 0 1 60 491 Tm (FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000894 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1020
+%%EOF

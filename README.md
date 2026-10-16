@@ -44,3 +44,21 @@ No file is sent to any server.
 - Dates are read day first (DD/MM/YYYY).
 - This is a demo. It checks the wording only. It does **not** prove a certificate is real.
 - The list is only in this browser. Clearing browser data removes it.
+
+## Categories and requests (v3)
+
+- The result shows **Category: <name>** from the OffshoreGigs certificate category list in
+  `categories.js` (exact names from the OffshoreGigs admin certificate catalogue snapshot,
+  51 enabled entries). Matching: OPITO course code (e.g. "Course Code:5501" -> "5501 - T BOSIET"),
+  then BOSIET/FOET/CA-EBS variant (Tropical, CA-EBS/EBS, TSBB), then the list name's words.
+- Expired certificates are detected and flagged in red ("Expired on DD/MM/YYYY"). Confirm is still
+  allowed ("Confirm (expired)") and the list shows a red chip.
+- A certificate that is not in the list shows "This certificate isn't in our list yet" with the
+  detected title and a **Request to add this category** button.
+- `admin.html` (OffshoreGigs Admin - Category requests) lists the requests with Approve/Reject.
+  Approve adds the title to the list, so later uploads match it.
+- **Demo only:** requests and added categories live in this browser's localStorage (same browser
+  only). The real app needs a backend table for requests and categories.
+- Images are upscaled, greyscaled and contrast-stretched before OCR, and read with automatic page
+  layout (PSM 3), then sparse text (PSM 11) and the original image if fields are missing.
+- Tests: `node tools/test_detect.js` and `python3 tools/test_e2e.py URL OUTDIR`.

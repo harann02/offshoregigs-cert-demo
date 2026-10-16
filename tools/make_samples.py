@@ -39,7 +39,8 @@ def make_pdf(path, pages):
 BOSIET = [
     (13, 'Demo Survival Training Centre Sdn Bhd'),
     (26, 'BOSIET'),
-    (14, 'Basic Offshore Safety Induction and Emergency Training'),
+    (14, 'Basic Offshore Safety Induction and Emergency Training with EBS'),
+    (12, 'OPITO Course Code: 5700'),
     (16, 'Certificate of Completion'),
     (14, 'Name: AHMAD DEMO SAMPLE'),
     (14, 'Certificate No: DEMO-BOS-000123'),
@@ -75,8 +76,21 @@ TROPICAL = [
     (14, 'Certificate No : 000000DEMO000123'),
     (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
 ]
+IRATA = [
+    (13, 'Demo Rope Access Academy Sdn Bhd'),
+    (16, 'Certificate of Competence'),
+    (12, 'This is to certify'),
+    (16, 'SITI DEMO EXAMPLE'),
+    (12, 'has successfully completed'),
+    (14, 'IRATA Rope Access Technician Level 1'),
+    (14, 'Certificate No: DEMO-IRT-000789'),
+    (14, 'Date of Issue: 05/05/2025'),
+    (14, 'Expiry Date: 05/05/2028'),
+    (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
+]
 UNKNOWN = [(20, 'Shopping list'), (14, 'Bread, milk, eggs'), (11, 'FAKE SAMPLE FOR TESTING ONLY')]
 make_pdf('samples/sample-bosiet-FAKE.pdf', [BOSIET])
 make_pdf('samples/sample-multiple-FAKE.pdf', [BOSIET, MEDICAL])
 make_pdf('samples/sample-unknown-FAKE.pdf', [UNKNOWN])
 make_pdf('samples/sample-tropical-bosiet-caebs-FAKE.pdf', [TROPICAL])
+make_pdf('samples/sample-irata-not-listed-FAKE.pdf', [IRATA])

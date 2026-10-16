@@ -52,8 +52,8 @@
   const MONTHS = {}; ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].forEach((m, i) => { MONTHS[m] = i + 1; });
 
   const DATE = String.raw`(\d{1,2}(?:st|nd|rd|th)?\s*(?:-|–|to)\s*\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s*\d{4}|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s*[A-Za-z]{3,9}\.?,?\s*\d{4}|[A-Za-z]{3,9}\.?\s*\d{1,2}(?:st|nd|rd|th)?\s*,?\s*\d{4})`;
-  const ISSUE_LABEL = String.raw`(?:date\s*of\s*(?:issue|award|completion|examination|medical|assessment|training)|issue[d]?\s*(?:date|on)?|awarded(?:\s*on)?|completion\s*date|date\s*completed|course\s*date|training\s*date|examination\s*date|date\s*of\s*course|tarikh\s*dikeluarkan)`;
-  const EXPIRY_LABEL = String.raw`(?:date\s*of\s*expiry|expiry(?:\s*date)?|expiration(?:\s*date)?|expires(?:\s*on)?|(?:valid|validity)\s*(?:until|till|til|to|through|thru)|fit\s*until|next\s*(?:medical|examination)\s*due|sah\s*sehingga|tarikh\s*luput)`;
+  const ISSUE_LABEL = String.raw`(?:date\s*of\s*(?:[il1|]ss?ue|award|completion|examination|medical|assessment|training)|[il1|]ssue[d]?\s*(?:date|on)?|awarded(?:\s*on)?|completion\s*date|date\s*completed|course\s*date|training\s*date|examination\s*date|date\s*of\s*course|tarikh\s*dikeluarkan)`;
+  const EXPIRY_LABEL = String.raw`(?:date\s*of\s*exp[il1|]ry|exp[il1|]ry(?:\s*date)?|expiration(?:\s*date)?|expires(?:\s*on)?|(?:valid|validity)\s*(?:until|till|til|to|through|thru)|fit\s*until|next\s*(?:medical|examination)\s*due|sah\s*sehingga|tarikh\s*luput)`;
   const CERT_LABEL = String.raw`(?:certificate|certification|cert)\s*(?:no\.?|number|#|ref(?:erence)?)|serial\s*(?:no\.?|number)|reference\s*(?:no\.?|number)|ref\.?\s*no\.?|opito\s*(?:certification|learner|delegate)?\s*(?:no\.?|number|id)`;
   const PROVIDER_LABEL = String.raw`(?:training\s*(?:provider|centre|center|organisation|organization)|provider|issued\s*by|centre|center|medical\s*(?:centre|center|clinic)|clinic)`;
   const DOCTOR_LABEL = String.raw`(?:examining\s*(?:doctor|physician)|approved\s*(?:doctor|examiner)|medical\s*examiner)`;
@@ -199,6 +199,11 @@
       if (line.length <= 90 && new RegExp(PROVIDER_WORDS, 'i').test(line) && line !== person &&
           !/certif|has\s+(?:successfully\s+)?completed|this\s+is|emergency\s+training|induction|course|:/i.test(line)) return line.trim();
     }
+    // Last resort: the issuer's website printed on the certificate (e.g. "www.example.ae").
+    for (const line of lines) {
+      const m = /\bwww\s*\.\s*([a-z0-9-]+(?:\s*\.\s*[a-z]{2,10}){1,2})\b/i.exec(line);
+      if (m) return m[1].replace(/\s+/g, '').toLowerCase();
+    }
     return null;
   }
 
@@ -245,7 +250,7 @@
     let name = labelled(lines, String.raw`^(?:full\s*name|candidate(?:\s*name)?|participant(?:\s*name)?|name|nama)\s*(?::|$)`, isName);
     if (!name.value && !name.evidence.length) {
       for (let i = 0; i < lines.length; i++) {
-        if (/^has\s+successfully\s+completed\b/i.test(lines[i]) && i) {
+        if (/^(?:who\s+)?(?:has|have)\s+(?:successfully\s+)?(?:completed|attended|passed)\b/i.test(lines[i]) && i) {
           const c = lines[i - 1];
           if (isName(c) && c.includes(' ')) { name = field(c, [c + '\n' + lines[i]]); break; }
         }
@@ -257,9 +262,16 @@
     }
     if (!name.value && !name.evidence.length) {
       for (let i = 0; i < lines.length; i++) {
-        if (/presents?\s+(?:this|his)\s+certi(?:f|l)icate/i.test(lines[i])) {
-          const c = labelled(lines.slice(i + 1, i + 3), String.raw`^to\s*(?::|$)`, isName, 1);
-          if (c.value) { name = c; break; }
+        if (/presents?\s+(?:this|his)\s+c[a-z]{5,10}/i.test(lines[i])) {
+          const tail = lines[i].replace(/^.*?presents?\s+(?:this|his)\s+c[a-z]{5,10}\s*(?:to\b)?\s*:?\s*/i, '');
+          if (isName(tail) && tail.includes(' ')) { name = field(tail, [lines[i]]); break; }
+          // OCR of script fonts often turns the "To" line into "Yo", "Jo", "To." etc.
+          for (const c of lines.slice(i + 1, i + 4)) {
+            if (/^[A-Za-z]{1,2}\W*$/.test(c)) continue;
+            if (isName(c) && c.includes(' ') && !/^who\b|completed|course/i.test(c)) { name = field(c, [lines[i] + '\n' + c]); }
+            break;
+          }
+          if (name.value) break;
         }
       }
     }
@@ -306,17 +318,114 @@
     };
   }
 
-  // server.py summarise()
-  function summarise(found, filename = 'upload') {
-    const unknown = found.category === UNKNOWN || found.confidence < CONFIDENCE_THRESHOLD;
-    const status = found.multiple_certificates ? 'multiple' : unknown ? 'unknown' : 'ok';
+  // ---- course title + OffshoreGigs category matching ----
+  const LABEL_START = /^(?:opito|course\s*code|certificate\s*no|cert|date|training\s*date|ic\b|passport|name|this\s+certificate|valid|expiry|issued|provider|who\b|in$)/i;
+  function courseTitle(lines) {
+    const intro = /^(?:in|for|the|course)$|(?:has|have)\s+(?:successfully\s+)?(?:completed|attended|passed)|learning\s+outcomes\s+for|completed\s+a\b.*course|^in\s*\|?$/i;
+    const ok = (l) => l && l.length >= 4 && l.length <= 110 && !/:/.test(l) && !LABEL_START.test(l) && /[a-z]{3}/i.test(l);
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (!intro.test(lines[i])) continue;
+      let j = i + 1;
+      if (/^(?:in|for)\W*$/i.test(lines[j]) || /^who\b/i.test(lines[j])) j++;
+      if (/^(?:in|for)\W*$/i.test(lines[j])) j++;
+      let t = lines[j];
+      if (!ok(t)) continue;
+      const next = lines[j + 1];
+      if (next && ok(next) && !/\d/.test(next) && (/(?:&|and|with|of)$/i.test(t) || next.length < 40)) t += ' ' + next;
+      return t.replace(/\s+/g, ' ').trim();
+    }
+    const kw = /(?:training|course|awareness|induction|technician|competen|medical|safety|rescue|first\s+aid)/i;
+    for (const l of lines) if (ok(l) && kw.test(l) && !/this\s+is\s+to|certificate\s+of\s+(?:completion|competence|attendance|achievement)|sdn|bhd|ltd|centre|center|academy|clinic/i.test(l)) return l.trim();
+    return null;
+  }
+
+  const STOP = new Set(['and', 'at', 'of', 'the', 'with', 'for', 'to', 'in', 'a', 'i', 'f']);
+  const words = (s) => normalized(String(s).replace(/\([^)]*\)/g, ' ')).split(' ').filter((w) => w && !STOP.has(w));
+  function attrs(text) {
+    const c = compact(text), p = ' ' + normalized(text) + ' ';
+    const caebs = /caebs|compressedair/.test(c);
     return {
-      status, can_confirm: status === 'ok', type: unknown ? null : found.category, confidence: found.confidence,
+      tropical: /\btropical\b|\bt (?:bosiet|foet)\b/.test(p),
+      caebs, ebs: caebs || /\bebs\b|emergencybreathing/.test(p + c),
+      tsbb: /\btsbb\b/.test(p) || /travelsafelybyboat/.test(c),
+      shallow: /shallowwater/.test(c),
+    };
+  }
+  const BASES = { 'BOSIET': 'bosiet', 'FOET': 'foet', 'CA-EBS': 'caebs' };
+  function baseOf(name) {
+    const p = ' ' + normalized(name) + ' ', c = compact(name);
+    if (/\bbosiet\b/.test(p)) return 'BOSIET';
+    if (/\bfoet\b/.test(p)) return 'FOET';
+    if (/caebs/.test(c) && !/bosiet|foet/.test(c)) return 'CA-EBS';
+    return null;
+  }
+
+  /* Map a detected certificate to one name in the OffshoreGigs list.
+   * 1) OPITO course code ("Course Code: 5501") equal to a list entry's "5501 - ..." prefix.
+   * 2) OPITO family (BOSIET/FOET/CA-EBS) + modifiers (Tropical, CA-EBS/EBS, TSBB, shallow water).
+   * 3) Any other list name whose significant words all appear in the text (longest wins). */
+  function matchCategory(text, found, categories) {
+    const names = (categories || []).filter(Boolean);
+    const code = /course\s*code\s*[:.\-]?\s*(\d{4})\b/i.exec(text);
+    if (code) {
+      const hit = names.find((n) => new RegExp('^\\s*' + code[1] + '\\s*-').test(n));
+      if (hit) return { name: hit, how: 'OPITO course code ' + code[1] };
+    }
+    const base = found && BASES[found.category] ? found.category : null;
+    if (base) {
+      const t = attrs(text);
+      const ranked = names.filter((n) => baseOf(n) === base).map((n) => {
+        const a = attrs(n);
+        const keys = base === 'CA-EBS' ? ['shallow'] : ['tropical', 'caebs', 'ebs', 'tsbb'];
+        const exact = keys.every((k) => a[k] === t[k]);
+        return { n, exact, initial: /\(i\)|initial/i.test(n) ? 1 : 0 };
+      }).filter((r) => r.exact).sort((a, b) => b.initial - a.initial || a.n.length - b.n.length);
+      if (ranked.length) return { name: ranked[0].n, how: base + ' variant' };
+    }
+    const have = new Set(normalized(text).split(' '));
+    let best = null;
+    for (const n of names) {
+      if (base && baseOf(n)) continue;
+      const w = words(n);
+      if (w.length && w.every((x) => have.has(x)) && (!best || w.length > best.w)) best = { name: n, how: 'name words', w: w.length };
+    }
+    return best ? { name: best.name, how: best.how } : null;
+  }
+
+  function looksLikeCertificate(text) {
+    return /certif|training|course|competen|awarded|completed|assessed|expiry|valid\s+(?:until|till)/i.test(text);
+  }
+
+  // server.py summarise()
+  function isExpired(ddmmyyyy, today = new Date()) {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(ddmmyyyy || '');
+    if (!m) return false;
+    const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return new Date(+m[3], +m[2] - 1, +m[1]) < t;
+  }
+
+  // status: ok | not_listed | multiple | unknown. Expired certificates stay "ok" but are flagged.
+  function summarise(found, filename = 'upload', opts = {}) {
+    const text = opts.text || '';
+    const unknownType = found.category === UNKNOWN || found.confidence < CONFIDENCE_THRESHOLD;
+    const match = opts.categories ? matchCategory(text, unknownType ? null : found, opts.categories) : null;
+    const title = courseTitle(splitLines(text)) || (unknownType ? null : found.category);
+    let status;
+    if (found.multiple_certificates) status = 'multiple';
+    else if (match) status = 'ok';
+    else if (!opts.categories && !unknownType) status = 'ok';
+    else if ((!unknownType || looksLikeCertificate(text)) && title) status = 'not_listed';
+    else status = 'unknown';
+    const expired = isExpired(found.expiry_date, opts.today);
+    return {
+      status, can_confirm: status === 'ok', expired,
+      category: match ? match.name : null, category_how: match ? match.how : null, detected_title: title,
+      type: unknownType ? null : found.category, confidence: found.confidence,
       name: found.name, certificate_number: found.certificate_number, issue_date: found.issue_date,
       expiry_date: found.expiry_date, provider: found.provider, multiple_reasons: found.multiple_reasons, filename,
     };
   }
 
-  const api = { detect, summarise, parseDate, normalized, scoreText, confidenceFrom, TYPES, UNKNOWN, CONFIDENCE_THRESHOLD };
+  const api = { detect, summarise, matchCategory, courseTitle, isExpired, parseDate, normalized, scoreText, confidenceFrom, TYPES, UNKNOWN, CONFIDENCE_THRESHOLD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CertDetect = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -76,3 +76,5 @@ html,body{margin:0;background:#E9EDF2;font-family:-apple-system,BlinkMacSystemFo
 @media (max-width:430px){.phone{box-shadow:none}}
 .sample{margin:10px 0 0;font-size:13px;color:var(--muted);text-align:center}
 .sample a{color:#0F766E;font-weight:700}
+.warn.green{background:#E6F6EE;color:#11643A;border:1px solid #9AD8B6}
+.exp{color:#C92A2A}

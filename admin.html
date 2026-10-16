@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OffshoreGigs Admin - Category requests</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css?v=3">
+<style>
+body{background:#F3F5F8;font-family:system-ui,sans-serif;color:#0B2A4A;margin:0}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+.demo{background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;border-radius:12px;padding:12px;font-size:14px;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;font-size:14px}
+th,td{padding:10px;border-bottom:1px solid #E5E7EB;text-align:left;vertical-align:top}
+th{background:#0B2A4A;color:#fff}
+.st{font-weight:600}.Pending{color:#B45309}.Approved{color:#15803D}.Rejected{color:#B91C1C}
+button.a,button.r{border:0;border-radius:8px;padding:6px 10px;color:#fff;cursor:pointer;margin:2px}
+button.a{background:#0E9F8E}button.r{background:#C92A2A}
+details{margin-top:16px;background:#fff;border-radius:12px;padding:12px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OffshoreGigs Admin - Category requests</h1>
+  <div class="demo"><b>DEMO ONLY.</b> Requests and approved categories are stored in this browser's localStorage, so this page only shows requests made in the <b>same browser</b>. The real app needs a backend table (for example <code>certificate_category_requests</code>) and a categories table shared by all users and admins. <a href="./">Back to the upload demo</a></div>
+  <table>
+    <thead><tr><th>Detected title</th><th>File name</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <details><summary>Current category list (<span id="count"></span>)</summary><ol id="cats"></ol></details>
+</div>
+<script src="categories.js?v=3"></script>
+<script>
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function render() {
+  const reqs = OGCategories.requests();
+  document.getElementById('rows').innerHTML = reqs.length ? reqs.map((r) => `<tr data-id="${esc(r.id)}">
+    <td>${esc(r.detected_title)}</td><td>${esc(r.file_name)}</td><td>${esc(new Date(r.date).toLocaleString())}</td>
+    <td class="st ${esc(r.status)}">${esc(r.status)}</td>
+    <td>${r.status === 'Pending' ? `<button class="a" data-act="1">Approve</button><button class="r" data-act="0">Reject</button>` : ''}</td></tr>`).join('')
+    : '<tr><td colspan="5">No requests yet. Upload a certificate that is not in the list on the demo page and press "Request to add this category".</td></tr>';
+  const all = OGCategories.all(), added = OGCategories.added();
+  document.getElementById('count').textContent = all.length + ' categories, ' + added.length + ' added by admin';
+  document.getElementById('cats').innerHTML = all.map((n) => `<li>${esc(n)}${added.includes(n) ? ' <b>(added)</b>' : ''}</li>`).join('');
+}
+document.getElementById('rows').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  OGCategories.decide(b.closest('tr').dataset.id, b.dataset.act === '1'); render();
+});
+render();
+</script>
+</body>
+</html>
