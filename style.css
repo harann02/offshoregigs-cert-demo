@@ -82,3 +82,7 @@ html,body{margin:0;background:#E9EDF2;font-family:-apple-system,BlinkMacSystemFo
 .opito-btn{display:block;text-align:center;border-radius:12px;background:#1E3A8A;color:#fff;font-weight:700;font-size:16px;padding:12px;text-decoration:none}
 .copy-btn{border:1px solid #D1D5DB;border-radius:10px;background:#fff;color:#374151;font-size:13px;font-weight:600;padding:6px 12px;margin-top:8px;cursor:pointer}
 .opito-note{font-size:13px;color:#4B5563;margin:6px 2px 0}
+
+.manual label{display:block;font-weight:700;color:var(--navy);margin-bottom:6px}
+.manual input,.manual select{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:15px;margin-top:6px;background:#fff}
+.manual select option[hidden]{display:none}

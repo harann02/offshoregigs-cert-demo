@@ -43,24 +43,42 @@ with sync_playwright() as p:
     res['tropical'] = {'text': t, 'ok': all(s in t for s in ['Category\n5509 - T BOSIET WITH CAEBS & TSBB', 'AHMAD DEMO SAMPLE', '000000DEMO000123', '12/03/2025', '11/03/2029']) and pg.locator('#confirmBtn').count() == 1}
     pg.click('#cancelBtn')
     t = upload(S / 'sample-multiple-FAKE.pdf'); shot('05_multiple_warning.png')
-    res['multiple'] = {'text': t, 'ok': 'Multiple certificates detected' in t and pg.locator('#confirmBtn').count() == 0}
+    res['multiple'] = {'text': t, 'ok': 'Multiple certificates detected' in t and pg.locator('#confirmBtn').count() == 0 and pg.locator('#submitBtn').count() == 0}
     pg.click('#cancelBtn')
-    t = upload(S / 'sample-unknown-FAKE.pdf'); shot('06_unknown.png')
-    res['unknown'] = {'text': t, 'ok': 'clearer copy' in t and pg.locator('#confirmBtn').count() == 0}
-    pg.click('#cancelBtn')
-    t = upload(S / 'sample-irata-not-listed-FAKE.pdf'); shot('08_not_in_list.png')
-    ok = "This certificate isn't in our list yet" in t and 'IRATA Rope Access Technician Level 1' in t and pg.locator('#confirmBtn').count() == 0
-    pg.click('#requestBtn'); pg.wait_for_selector('#reqSent:not([hidden])'); shot('09_request_sent.png')
-    res['not_listed'] = {'text': t, 'ok': ok and 'Request sent - our team will review it' in pg.inner_text('#result'),
-        'stored': pg.evaluate("JSON.parse(localStorage.getItem('offshoregigs-category-requests'))")}
-    pg.click('#cancelBtn')
+    # Unknown flow: pick an existing category
+    t = upload(S / 'sample-unknown-FAKE.pdf')
+    dis = pg.is_disabled('#submitBtn')
+    pg.fill('#catSearch', 'first aid'); vis = pg.evaluate("[...document.querySelectorAll('#catSelect option')].filter(o=>!o.hidden).map(o=>o.value)")
+    pg.select_option('#catSelect', 'BASIC FIRST AID'); shot('15_unknown_manual.png')
+    res['unknown_existing'] = {'text': t, 'ok': "We couldn't match this document" in t and 'clearer copy' not in t and 'Not found' in t and dis and not pg.is_disabled('#submitBtn')
+        and 'BASIC FIRST AID' in vis and '5501 - T BOSIET' not in vis and '__other' in vis and pg.locator('#confirmBtn').count() == 0 and pg.locator('#cancelBtn').count() == 1}
+    pg.click('#submitBtn'); pg.wait_for_selector('.item:has-text("BASIC FIRST AID")')
+    res['unknown_existing']['chip'] = pg.inner_text('.item >> nth=0')
+    res['unknown_existing']['ok'] &= 'Pending approval' in res['unknown_existing']['chip']
+    # Not in list: Other -> typed new category
+    t = upload(S / 'sample-irata-not-listed-FAKE.pdf')
+    pg.select_option('#catSelect', '__other'); d1 = pg.is_disabled('#submitBtn'); vis_other = pg.is_visible('#otherName')
+    pg.fill('#otherName', 'IRATA Rope Access Technician Level 1')
+    res['other_new'] = {'text': t, 'ok': "We couldn't match this document" in t and 'IRATA Rope Access Technician Level 1' in t and 'Request to add' not in t and d1 and vis_other and not pg.is_disabled('#submitBtn')}
+    pg.click('#submitBtn'); pg.wait_for_selector('.item:has-text("IRATA")'); shot('16_pending.png')
+    res['other_new']['chip'] = pg.inner_text('.item >> nth=0')
+    res['other_new']['ok'] &= 'Pending approval' in res['other_new']['chip']
+    res['requests'] = pg.evaluate("JSON.parse(localStorage.getItem('offshoregigs-category-requests'))")
     ad = pg.context.new_page()
-    ad.set_viewport_size({'width': 900, 'height': 700}); ad.goto(URL.rstrip('/') + '/admin.html'); ad.wait_for_selector('tr[data-id]')
-    ad.screenshot(path=str(OUT / '10_admin_pending.png'), full_page=True)
-    ad.click('button.a'); ad.wait_for_selector('td.Approved'); ad.click('summary')
-    ad.screenshot(path=str(OUT / '11_admin_approved.png'), full_page=True)
-    res['admin'] = {'title': ad.title(), 'row': ad.inner_text('tbody'), 'added': ad.evaluate("localStorage.getItem('offshoregigs-categories-added')")}
+    ad.set_viewport_size({'width': 390, 'height': 844}); ad.goto(URL.rstrip('/') + '/admin.html'); ad.wait_for_selector('tr[data-id]')
+    ad.screenshot(path=str(OUT / '17_admin_review.png'), full_page=True)
+    rows = ad.inner_text('tbody')
+    res['admin_rows'] = {'text': rows, 'ok': all(x in rows for x in ['sample-irata-not-listed-FAKE.pdf', 'sample-unknown-FAKE.pdf', 'IRATA Rope Access Technician Level 1', 'BASIC FIRST AID', 'Yes (new)', 'No (existing)', 'Pending', 'Name:'])}
+    ad.click('tr:has-text("IRATA") button.a'); ad.wait_for_selector('tr:has-text("IRATA") td.Approved')
+    ad.click('tr:has-text("BASIC FIRST AID") button.r'); ad.wait_for_selector('tr:has-text("BASIC FIRST AID") td.Rejected')
+    ad.click('summary'); ad.screenshot(path=str(OUT / '17b_admin_decided.png'), full_page=True)
+    res['admin'] = {'added': ad.evaluate("localStorage.getItem('offshoregigs-categories-added')")}
     ad.close()
+    pg.reload(); pg.wait_for_selector('.item')
+    li = pg.inner_text('#list'); shot('18_list_decided.png')
+    irata = pg.inner_text('.item:has-text("IRATA")'); bfa = pg.inner_text('.item:has-text("BASIC FIRST AID")')
+    res['decisions'] = {'ok': 'Approved by admin' in irata and 'Rejected' in bfa and 'IRATA Rope Access Technician Level 1' in (res['admin']['added'] or '')
+        and pg.locator('.item .chip.green:has-text("Approved by admin")').count() == 1 and pg.locator('.item .chip.red:has-text("Rejected")').count() == 1}
     t = upload(S / 'sample-irata-not-listed-FAKE.pdf'); shot('12_after_approve.png')
     res['after_approve'] = {'text': t, 'ok': 'Category\nIRATA Rope Access Technician Level 1' in t and pg.locator('#confirmBtn').count() == 1 and pg.locator('#result .opito-btn').count() == 0}
     pg.click('#cancelBtn'); pg.reload(); pg.wait_for_selector('.item')

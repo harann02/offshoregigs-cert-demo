@@ -209,21 +209,26 @@ $('uploadBtn').addEventListener('click', async () => {
 
 function renderResult(r) {
   pending = r;
-  let head = '', warn = '', rows = '', confirm = '';
+  let head = '', warn = '', rows = '', confirm = '', manual = false;
   if (r.status === 'multiple') {
     head = '<h4>More than one certificate found</h4>';
     warn = `<div class="warn red"><b>Multiple certificates detected</b>This file looks like it has more than one certificate. Please upload one certificate at a time.</div>`;
-  } else if (r.status === 'unknown') {
-    head = '<h4>Certificate not recognised</h4>';
-    warn = `<div class="warn amber">We couldn't recognise this certificate. Please upload a clearer copy.</div>`;
-  } else if (r.status === 'not_listed') {
-    head = `<h4>This certificate isn't in our list yet</h4><p class="det">We read this certificate, but its type is not in the OffshoreGigs category list.</p>`;
-    rows = `<div class="rows"><div class="row"><span>Detected title</span><b id="detTitle">${esc(r.detected_title)}</b></div>
+  } else if (r.status === 'unknown' || r.status === 'not_listed') {
+    manual = true;
+    head = `<h4>We couldn't match this document</h4><p class="det">Choose the certificate category yourself. Our team will review it before it is approved.</p>`;
+    const cats = OGCategories.all();
+    rows = `<div class="manual"><label for="catSearch">Certificate category</label>
+      <input id="catSearch" type="search" placeholder="Search categories..." autocomplete="off">
+      <select id="catSelect" size="6">${cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}<option value="__other">Other (type the name)</option></select>
+      <input id="otherName" type="text" placeholder="Type the certificate name" hidden></div>
+      <p class="det" style="margin-top:12px">Read from your document (cannot be edited):</p>
+      <div class="rows">
+      ${r.detected_title ? `<div class="row"><span>Detected title</span><b id="detTitle">${esc(r.detected_title)}</b></div>` : ''}
       <div class="row"><span>Name</span>${val(r.name)}</div>
+      <div class="row"><span>Certificate No</span>${val(r.certificate_number)}</div>
+      <div class="row"><span>Issue date</span>${val(r.issue_date)}</div>
       <div class="row"><span>Expiry date</span>${val(r.expiry_date)}</div></div>`;
-    const prior = OGCategories.requests().find((q) => q.status === 'Pending' && q.detected_title.toLowerCase() === String(r.detected_title).toLowerCase());
-    confirm = prior ? '<div class="warn green" id="reqSent">Request sent - our team will review it</div>'
-      : '<button class="teal" id="requestBtn" type="button">Request to add this category</button><div class="warn green" id="reqSent" hidden>Request sent - our team will review it</div>';
+    confirm = '<button class="teal" id="submitBtn" type="button" disabled>Submit for approval</button>';
   } else {
     head = `<h4>We detected: ${esc(r.category)}</h4><p class="det">Read from your document. These details cannot be edited.</p>`;
     if (r.expired) warn = `<div class="warn red" id="expiredWarn"><b>Expired on ${esc(r.expiry_date)}</b>This certificate has expired. You can still add it, but it will show as expired and may not be accepted for jobs.</div>`;
@@ -241,10 +246,27 @@ function renderResult(r) {
   show('result');
   $('cancelBtn').onclick = cancel;
   if ($('confirmBtn')) $('confirmBtn').onclick = confirmIt;
-  if ($('requestBtn')) $('requestBtn').onclick = () => {
-    OGCategories.request(r.detected_title, r.filename);
-    $('requestBtn').hidden = true; $('reqSent').hidden = false;
-  };
+  if (manual) {
+    const sel = $('catSelect'), q = $('catSearch'), other = $('otherName'), btn = $('submitBtn');
+    const chosen = () => sel.value === '__other' ? other.value.trim() : sel.value;
+    const upd = () => { other.hidden = sel.value !== '__other'; btn.disabled = !chosen(); };
+    q.oninput = () => { const t = q.value.toLowerCase(); for (const o of sel.options) o.hidden = o.value !== '__other' && !o.text.toLowerCase().includes(t); };
+    sel.onchange = () => { upd(); if (!other.hidden) other.focus(); };
+    other.oninput = upd;
+    btn.onclick = () => submitManual(chosen());
+  }
+}
+
+function submitManual(category) {
+  if (!pending || !category) return;
+  const item = { type: category, category, approval: 'pending', manual: true };
+  for (const k of ['detected_title', 'name', 'certificate_number', 'issue_date', 'expiry_date', 'filename']) item[k] = pending[k] || null;
+  item.id = Math.random().toString(16).slice(2) + Date.now().toString(16); item.confirmed_at = new Date().toISOString();
+  const req = OGCategories.submit({ category, file_name: pending.filename, cert_id: item.id,
+    fields: { name: item.name, certificate_number: item.certificate_number, issue_date: item.issue_date, expiry_date: item.expiry_date } });
+  item.request_id = req.id; item.new_category = req.is_new;
+  const list = items(); list.unshift(item); save(list);
+  cancel(); load();
 }
 
 function cancel() {
@@ -263,6 +285,13 @@ function confirmIt() {
   cancel(); load();
 }
 
+function statusChip(c) {
+  if (c.approval === 'pending') return '<span class="chip amber st-chip">Pending approval</span>';
+  if (c.approval === 'approved') return '<span class="chip green st-chip">Approved by admin</span>';
+  if (c.approval === 'rejected') return '<span class="chip red st-chip">Rejected</span>';
+  return '<span class="chip ver">✓ Verified from document</span>';
+}
+
 function load() {
   const list = items();
   stamp();
@@ -274,7 +303,7 @@ function load() {
     <div class="card item">
       <div class="item-top"><h5>${esc(c.type)}</h5></div>
       <div class="meta">${esc(c.name || 'Name not found')}<br>No: ${esc(c.certificate_number || 'Not found')}</div>
-      <div class="chips">${expiryChip(c.expiry_date)}<span class="chip ver">✓ Verified from document</span></div>
+      <div class="chips">${expiryChip(c.expiry_date)}${statusChip(c)}</div>
       ${opitoBlock(c.category || c.type, c.name, c.certificate_number)}
     </div>`).join('');
 }

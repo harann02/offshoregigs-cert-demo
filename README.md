@@ -54,7 +54,7 @@ No file is sent to any server.
 - Expired certificates are detected and flagged in red ("Expired on DD/MM/YYYY"). Confirm is still
   allowed ("Confirm (expired)") and the list shows a red chip.
 - A certificate that is not in the list shows "This certificate isn't in our list yet" with the
-  detected title and a **Request to add this category** button.
+  detected title and a **Submit for approval** button.
 - `admin.html` (OffshoreGigs Admin - Category requests) lists the requests with Approve/Reject.
   Approve adds the title to the list, so later uploads match it.
 - **Demo only:** requests and added categories live in this browser's localStorage (same browser

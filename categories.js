@@ -75,12 +75,26 @@
         file_name: filename, date: new Date().toISOString(), status: 'Pending' };
       list.unshift(r); write(REQUESTS, list); return r;
     },
+    // Manual category submission for an unmatched document (Pending approval).
+    submit(o) {
+      const list = read(REQUESTS);
+      const isNew = !OGCategories.all().some((n) => n.toLowerCase() === String(o.category).toLowerCase());
+      const r = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'manual',
+        category: o.category, detected_title: o.category, is_new: isNew, file_name: o.file_name,
+        fields: o.fields || {}, cert_id: o.cert_id, date: new Date().toISOString(), status: 'Pending' };
+      list.unshift(r); write(REQUESTS, list); return r;
+    },
     decide(id, approve) {
       const list = read(REQUESTS); const r = list.find((x) => x.id === id);
       if (!r) return null;
       r.status = approve ? 'Approved' : 'Rejected'; r.decided_at = new Date().toISOString();
       write(REQUESTS, list);
-      if (approve) { const a = read(ADDED); if (!a.includes(r.detected_title)) { a.push(r.detected_title); write(ADDED, a); } }
+      const title = r.category || r.detected_title;
+      if (approve && (r.kind !== 'manual' || r.is_new)) { const a = read(ADDED); if (!OGCategories.all().includes(title)) { a.push(title); write(ADDED, a); } }
+      if (r.cert_id) {
+        const certs = read('offshoregigs-certificates'); const c = certs.find((x) => x.id === r.cert_id);
+        if (c) { c.approval = approve ? 'approved' : 'rejected'; c.decided_at = r.decided_at; write('offshoregigs-certificates', certs); }
+      }
       return r;
     },
   };
