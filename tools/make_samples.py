@@ -121,3 +121,25 @@ WAH_CERT = [
     (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL CERTIFICATE'),
 ]
 make_pdf('samples/sample-front-back-FAKE.pdf', [WAH_CARD, WAH_CERT])
+
+QUOTE_P1 = [
+    (14, 'DEMO SUPPLIES SDN BHD (0000000-X)'), (11, 'Lot 0, Demo Industrial Park, 00000 Demo Town'),
+    (16, 'COMMERCIAL QUOTATION'),
+    (11, 'Quotation No. : DEMO/QT/2026/000'), (11, 'Quotation Date : 16/10/2026'),
+    (11, 'Attention : Mr Demo Client'), (11, 'PROJECT: DEMO INSULATION WORK'),
+    (11, 'Please refer to Appendix 1 Terms and Conditions and Appendix 2 Unit Rate Schedule.'),
+    (11, 'Regards, AHMAD DEMO SAMPLE, Head of Operations'),
+]
+QUOTE_P2 = [
+    (13, 'APPENDIX 1 - TERMS AND CONDITIONS'),
+    (10, '1. All work done shall be recorded in the handover certificate form prepared by the contractor.'),
+    (10, '2. All basic first aid assistance and emergency medical assistance at site shall be provided by Client.'),
+    (10, '3. Manpower shall be compensated on day work basis during any kind of training period or course.'),
+    (13, 'APPENDIX 2 - UNIT RATE SCHEDULE'),
+    (10, 'Item   Description              Qty   Unit Price   Total'),
+    (10, '1      Insulator (day rate)     1     RM 300.00    RM 300.00'),
+    (10, '2      First aid kit            1     RM 50.00     RM 50.00'),
+    (10, 'Subtotal RM 350.00'),
+    (11, 'FAKE SAMPLE FOR TESTING ONLY - NOT A REAL QUOTATION'),
+]
+make_pdf('samples/sample-quotation-FAKE.pdf', [QUOTE_P1, QUOTE_P2])

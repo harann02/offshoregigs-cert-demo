@@ -465,20 +465,38 @@
       }).filter((r) => r.exact).sort((a, b) => b.initial - a.initial || a.n.length - b.n.length);
       if (ranked.length) return { name: ranked[0].n, how: base + ' variant' };
     }
-    const have = new Set(normalized(text).split(' '));
+    // Name-word matching needs certificate context and must not look like a quotation/invoice.
+    // Words must appear together in a short title-like block (1-3 consecutive short lines),
+    // never scattered over the whole document (e.g. "first aid" in a quote's T&C list).
+    if (!hasCertContext(text) || looksLikeQuotation(text)) return null;
+    const ls = splitLines(text).filter((l) => l.length <= 70);
+    const blocks = [];
+    for (let i = 0; i < ls.length; i++) for (let k = 1; k <= 3 && i + k <= ls.length; k++) blocks.push(new Set(normalized(ls.slice(i, i + k).join(' ')).split(' ')));
     let best = null;
     for (const n of names) {
       if (base && baseOf(n)) continue;
       // "BASIC" is the default level, so "Working at Height Competency" still matches
       // "WORKING AT HEIGHT (WAH) BASIC" (but never LEVEL 2 / LEVEL 3, which need their words).
+      const have = new Set(normalized(text).split(' '));
       const w = words(n).filter((x) => !(OPTIONAL_WORDS.has(x) && !have.has(x)));
       if (w.length >= 2 || (w.length && w.length === words(n).length)) {
-        if (w.every((x) => have.has(x)) && (!best || w.length > best.w)) best = { name: n, how: 'name words', w: w.length };
+        if (blocks.some((b) => w.every((x) => b.has(x))) && (!best || w.length > best.w)) best = { name: n, how: 'name words', w: w.length };
       }
     }
     return best ? { name: best.name, how: best.how } : null;
   }
 
+  function hasCertContext(text) {
+    return /certif|competen|training|course|opito|\b\d{4}\s*-\s*[a-z]/i.test(text);
+  }
+  // Business documents: quotation / invoice / purchase order markers.
+  function quotationScore(text) {
+    const pats = [/\bquotation\b/i, /\binvoice\b/i, /\bquote\s*(?:no|number|ref)\b/i, /\bunit\s*(?:price|rate)\b/i,
+      /\bqty\b|\bquantity\b/i, /\bsub\s*-?total\b/i, /\b(?:grand\s*)?total\b/i, /\bRM\s*\d/, /\bpurchase\s*order\b|\bP\.?O\.?\s*No\b/i,
+      /\bterms\s+(?:and|&)\s+conditions\b/i, /\bBOQ\b|bill\s+of\s+quantit/i, /\bproposal\b/i];
+    return pats.filter((r) => r.test(text)).length;
+  }
+  function looksLikeQuotation(text) { return quotationScore(text) >= 2; }
   function looksLikeCertificate(text) {
     return /certif|training|course|competen|awarded|completed|assessed|expiry|valid\s+(?:until|till)/i.test(text);
   }
@@ -497,22 +515,28 @@
     const unknownType = found.category === UNKNOWN || found.confidence < CONFIDENCE_THRESHOLD;
     const match = opts.categories ? matchCategory(text, unknownType ? null : found, opts.categories) : null;
     const title = (found.title_text && courseTitle(splitLines(found.title_text))) || courseTitle(splitLines(text)) || (unknownType ? null : found.category);
+    const core = ['name', 'certificate_number', 'issue_date', 'expiry_date'].filter((k) => found[k]).length;
+    // Hard rule: fewer than 2 of the 4 core fields => never auto-detect / Confirm.
+    const weak = core < 2;
+    const notCert = weak || looksLikeQuotation(text);
     let status;
     if (found.multiple_certificates) status = 'multiple';
-    else if (match) status = 'ok';
-    else if (!opts.categories && !unknownType) status = 'ok';
-    else if ((!unknownType || looksLikeCertificate(text)) && title) status = 'not_listed';
+    else if (match && !weak) status = 'ok';
+    else if (weak && (match || !opts.categories)) status = 'unknown';
+    else if (!opts.categories && !unknownType && !weak) status = 'ok';
+    else if ((!unknownType || looksLikeCertificate(text)) && title && !looksLikeQuotation(text)) status = 'not_listed';
     else status = 'unknown';
     const expired = isExpired(found.expiry_date, opts.today);
     return {
-      status, can_confirm: status === 'ok', expired,
-      category: match ? match.name : null, category_how: match ? match.how : null, detected_title: title,
+      status, can_confirm: status === 'ok', expired, core_fields: core, not_certificate: status !== 'ok' && status !== 'multiple' && notCert,
+      looks_like_quotation: looksLikeQuotation(text),
+      category: match && status === 'ok' ? match.name : null, category_how: match ? match.how : null, detected_title: title,
       type: unknownType ? null : found.category, confidence: found.confidence,
       name: found.name, certificate_number: found.certificate_number, issue_date: found.issue_date,
       expiry_date: found.expiry_date, provider: found.provider, multiple_reasons: found.multiple_reasons, filename,
     };
   }
 
-  const api = { detect, detectPages, textSimilarity, summarise, matchCategory, courseTitle, isExpired, parseDate, normalized, scoreText, confidenceFrom, TYPES, UNKNOWN, CONFIDENCE_THRESHOLD };
+  const api = { detect, detectPages, textSimilarity, summarise, matchCategory, quotationScore, hasCertContext, courseTitle, isExpired, parseDate, normalized, scoreText, confidenceFrom, TYPES, UNKNOWN, CONFIDENCE_THRESHOLD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CertDetect = api;
 })(typeof window !== 'undefined' ? window : globalThis);

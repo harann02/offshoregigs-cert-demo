@@ -48,8 +48,8 @@ t('Tropical BOSIET with CA-EBS and TSBB -> 5509 by variant (course code not in l
   assert.strictEqual(r.category, '5509 - T BOSIET WITH CAEBS & TSBB'); assert.strictEqual(r.expired, false);
   assert.strictEqual(r.detected_title, 'Tropical BOSIET with CA-EBS and Travel Safely By Boat');
 });
-t('BOSIET with EBS (5700)', () => assert.strictEqual(run('BOSIET\nBasic Offshore Safety Induction and Emergency Training with EBS\nName: A B').category, '5700 - BOSIET WITH EBS'));
-t('word match for non-OPITO list entries', () => assert.strictEqual(run('Certificate of Completion\nThis is to certify\nAHMAD DEMO\nhas successfully completed\nBasic H2S Awareness').category, 'BASIC H2S'));
+t('BOSIET with EBS (5700)', () => assert.strictEqual(run('BOSIET\nBasic Offshore Safety Induction and Emergency Training with EBS\nName: A B\nCertificate No: DEMO-1\nExpiry Date: 01/01/2030').category, '5700 - BOSIET WITH EBS'));
+t('word match for non-OPITO list entries', () => assert.strictEqual(run('Certificate of Completion\nThis is to certify\nAHMAD DEMO\nhas successfully completed\nBasic H2S Awareness\nCertificate No: DEMO-H2S-1').category, 'BASIC H2S'));
 const IRATA = `Certificate of Competence\nThis is to certify\nSITI DEMO EXAMPLE\nhas successfully completed\nIRATA Rope Access Technician Level 1\nCertificate No: DEMO-IRT-000789\nExpiry Date: 05/05/2028`;
 t('certificate not in list -> not_listed with detected title', () => {
   const r = run(IRATA);
@@ -108,5 +108,23 @@ t('same name, different numbers (two certificates of one person) -> multiple', (
 });
 t('same type+name+both dates but number badly misread -> one certificate', () => {
   assert.strictEqual(runPages([B1, B1.replace('DEMO-BOS-000123', 'XQ7-88')]).status, 'ok');
+});
+const fs = require('fs');
+const QUOTE = fs.readFileSync(__dirname + '/../samples/sample-quotation-FAKE.txt', 'utf8');
+t('quotation mentioning "first aid", "training", "certificate" -> unknown, not a certificate, no Confirm', () => {
+  const r = run(QUOTE);
+  assert.strictEqual(r.status, 'unknown'); assert.strictEqual(r.can_confirm, false);
+  assert.strictEqual(r.category, null); assert.strictEqual(r.not_certificate, true); assert.ok(D.quotationScore(QUOTE) >= 2);
+});
+t('stray words scattered over a document do not match a category', () => {
+  assert.strictEqual(D.matchCategory('Training certificate\nItems: gloves, first aid kit, helmet and other very long list of basic site consumables supplied', null, CATS), null);
+});
+t('hard rule: real title but fewer than 2 core fields -> no Confirm', () => {
+  const r = run('Certificate of Completion\nThis is to certify\nAHMAD DEMO\nhas successfully completed\nBasic First Aid');
+  assert.strictEqual(r.status, 'unknown'); assert.strictEqual(r.can_confirm, false);
+});
+t('real Basic First Aid certificate with fields still matches', () => {
+  const r = run('Certificate of Completion\nThis is to certify\nAHMAD DEMO\nhas successfully completed\nBasic First Aid\nCertificate No: DEMO-FA-001\nExpiry Date: 01/01/2029');
+  assert.strictEqual(r.category, 'BASIC FIRST AID'); assert.strictEqual(r.can_confirm, true);
 });
 console.log(n + ' tests passed');

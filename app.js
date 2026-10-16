@@ -222,7 +222,8 @@ function renderResult(r) {
     warn = `<div class="warn red"><b>Multiple certificates detected</b>This file looks like it has more than one certificate. Please upload one certificate at a time.</div>`;
   } else if (r.status === 'unknown' || r.status === 'not_listed') {
     manual = true;
-    head = `<h4>We couldn't match this document</h4><p class="det">Choose the certificate category yourself. Our team will review it before it is approved.</p>`;
+    head = `<h4>We couldn't match this document</h4><p class="det">Choose the certificate category yourself. Our team will review it before it is approved.</p>` +
+      (r.not_certificate || r.core_fields < 2 ? `<div class="warn amber" id="notCertNote">This doesn't look like a certificate. If it is, choose the category and submit it for approval.</div>` : '');
     const cats = OGCategories.all();
     rows = `<div class="manual"><label for="catSearch">Certificate category</label>
       <input id="catSearch" type="search" placeholder="Search categories..." autocomplete="off">
