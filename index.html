@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OffshoreGigs – Certificates</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="phone">
+  <header class="top">
+    <h1>My Profile</h1>
+    <div class="top-actions">
+      <button class="pill" type="button"><span class="lang-ico">文A</span> BM</button>
+      <button class="gear" type="button" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path fill="#0B2A4A" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.2 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5A3.5 3.5 0 1 1 13 8.5a3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="behind"><div class="selfie">Take a selfie<small>We will compare this selfie with your ID</small></div></div>
+
+  <section class="sheet">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2>Certificates</h2><button class="x" type="button" aria-label="Close">✕</button></div>
+    <div class="sheet-body">
+      <h3 class="big">Certificates</h3>
+      <p class="sub">Upload and manage your certificates. We support PDF or image formats.</p>
+
+      <div class="instr">
+        <div class="instr-top">
+          <div class="doc-ico">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="#E8590C" stroke-width="2" d="M6 2h8l4 4v16H6zM14 2v4h4M9 12h6M9 16h6"/></svg>
+          </div>
+          <div><h4>Important Upload Instruction</h4>
+          <p>Please upload one certificate at a time. Do not combine all certificates into one PDF or image.</p></div>
+        </div>
+        <ul>
+          <li><span class="ok">✓</span>Upload only the matching certificate file.</li>
+          <li><span class="ok">✓</span>We read the certificate type for you automatically.</li>
+          <li><span class="no">✕</span>Do not upload BOSIET, Medical, OGUK, CA-EBS together.</li>
+        </ul>
+        <div class="example">Example: BOSIET → upload once, Medical → upload once, OGUK → upload once.</div>
+      </div>
+
+      <div class="card" id="uploadCard">
+        <label class="lbl">Upload File</label>
+        <label class="file" id="fileBox">
+          <input type="file" id="file" accept="application/pdf,image/png,image/jpeg" hidden>
+          <span class="clip">📎</span><span id="fileName">Tap to select a file</span>
+        </label>
+        <button class="teal" id="uploadBtn" type="button">Upload Certificate</button>
+        <p class="hint">* We read the details from your document. You cannot edit them. If something is wrong, upload a clearer copy.</p>
+        <p class="err" id="err" hidden></p>
+        <p class="sample"><a href="#" id="sampleLink">Try a sample</a> <span>(fake BOSIET, no real data)</span></p>
+      </div>
+
+      <div class="card reading" id="reading" hidden>
+        <div class="spinner"></div>
+        <p>Reading your certificate...</p>
+        <small id="readingNote">This can take a few seconds.</small>
+      </div>
+
+      <div class="card result" id="result" hidden></div>
+
+      <div class="card refresh-row">
+        <span>⟳ Last checked <b id="lastChecked">--</b></span>
+        <button class="refresh" id="refreshBtn" type="button">⟳ Refresh</button>
+      </div>
+
+      <h3 class="list-title">Your Uploaded Certificates</h3>
+      <div id="list"></div>
+    </div>
+  </section>
+</div>
+<script src="detect.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
